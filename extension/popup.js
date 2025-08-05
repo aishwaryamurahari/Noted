@@ -628,6 +628,7 @@ class SummarizeItPopup {
     async summarizeCurrentPage() {
         try {
             this.showLoading(true);
+            this.disableSummarizeButton(); // Disable button to prevent multiple clicks
 
             // Get current tab
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -656,6 +657,10 @@ class SummarizeItPopup {
             // Show detected category to user with option to change
             const finalCategory = await this.showCategoryConfirmation(summaryData.category);
 
+            // Hide category confirmation UI and show processing message
+            this.hideCategoryConfirmation();
+            this.showMessage('💾 Saving to Notion...', 'info');
+
             // Save to Notion via backend with category
             const notionPageUrl = await this.saveToNotionWithCategory(
                 summaryData.summary,
@@ -672,9 +677,25 @@ class SummarizeItPopup {
         } catch (error) {
             console.error('Error summarizing page:', error);
             this.showMessage(error.message, 'error');
+            this.hideCategoryConfirmation(); // Hide category UI if there's an error
         } finally {
             this.showLoading(false);
+            this.enableSummarizeButton(); // Re-enable button when process completes
         }
+    }
+
+    disableSummarizeButton() {
+        const summarizeBtn = document.getElementById('summarizeBtn');
+        summarizeBtn.disabled = true;
+        summarizeBtn.style.opacity = '0.5';
+        summarizeBtn.style.cursor = 'not-allowed';
+    }
+
+    enableSummarizeButton() {
+        const summarizeBtn = document.getElementById('summarizeBtn');
+        summarizeBtn.disabled = false;
+        summarizeBtn.style.opacity = '1';
+        summarizeBtn.style.cursor = 'pointer';
     }
 
     async extractPageContent(tabId) {
@@ -785,28 +806,83 @@ class SummarizeItPopup {
             categoryDisplay.textContent = detectedCategory;
             categorySelect.value = detectedCategory;
 
+            // Reset UI state
+            categorySelect.style.display = 'none';
+            confirmBtn.textContent = '✓ Confirm Category';
+            changeBtn.textContent = '✏️ Change';
+
             // Show confirmation UI
             categoryConfirm.style.display = 'block';
 
-            // Handle confirm button
-            const handleConfirm = () => {
-                categoryConfirm.style.display = 'none';
-                confirmBtn.removeEventListener('click', handleConfirm);
-                changeBtn.removeEventListener('click', handleChange);
-                resolve(categorySelect.value);
+            // Store original category for cancel functionality
+            let originalCategory = detectedCategory;
+            let isInChangeMode = false;
+
+            // Handle initial confirm button (confirm detected category)
+            const handleInitialConfirm = () => {
+                // Just confirm the category selection - no summarization here
+                this.showMessage(`✅ Category confirmed: ${originalCategory}`, 'info');
+                setTimeout(() => {
+                    cleanup();
+                    resolve(originalCategory);
+                }, 500); // Brief delay to show confirmation
             };
 
-            // Handle change button
+            // Handle change button (show dropdown)
             const handleChange = () => {
+                isInChangeMode = true;
                 categorySelect.style.display = 'block';
-                changeBtn.textContent = 'Confirm';
+
+                // Change button texts
+                confirmBtn.textContent = '✓ Confirm Selection';
+                changeBtn.textContent = '✖ Cancel';
+
+                // Remove old event listeners
+                confirmBtn.removeEventListener('click', handleInitialConfirm);
                 changeBtn.removeEventListener('click', handleChange);
-                changeBtn.addEventListener('click', handleConfirm);
+
+                // Add new event listeners
+                confirmBtn.addEventListener('click', handleNewCategoryConfirm);
+                changeBtn.addEventListener('click', handleCancel);
             };
 
-            confirmBtn.addEventListener('click', handleConfirm);
+            // Handle confirm button when in change mode (confirm new selection)
+            const handleNewCategoryConfirm = () => {
+                const selectedCategory = categorySelect.value;
+                this.showMessage(`✅ Category updated to: ${selectedCategory}`, 'info');
+                setTimeout(() => {
+                    cleanup();
+                    resolve(selectedCategory);
+                }, 500); // Brief delay to show confirmation
+            };
+
+            // Handle cancel button (keep original category)
+            const handleCancel = () => {
+                this.showMessage(`↩️ Keeping original category: ${originalCategory}`, 'info');
+                setTimeout(() => {
+                    cleanup();
+                    resolve(originalCategory);
+                }, 500); // Brief delay to show message
+            };
+
+            // Cleanup function to remove all event listeners and hide UI
+            const cleanup = () => {
+                categoryConfirm.style.display = 'none';
+                confirmBtn.removeEventListener('click', handleInitialConfirm);
+                confirmBtn.removeEventListener('click', handleNewCategoryConfirm);
+                changeBtn.removeEventListener('click', handleChange);
+                changeBtn.removeEventListener('click', handleCancel);
+            };
+
+            // Set up initial event listeners
+            confirmBtn.addEventListener('click', handleInitialConfirm);
             changeBtn.addEventListener('click', handleChange);
         });
+    }
+
+    hideCategoryConfirmation() {
+        const categoryConfirm = document.getElementById('categoryConfirm');
+        categoryConfirm.style.display = 'none';
     }
 
     async saveToNotion(summary, url, title) {

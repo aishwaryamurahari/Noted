@@ -268,9 +268,27 @@
     </div>
 
     <div id="error" class="error" style="display: none;"></div>
+
+    <button id="connectNotion" class="button secondary">
+        Connect to Notion
+    </button>
+
+    <div class="settings">
+        <div class="input-group">
+            <label for="openaiKey">OpenAI API Key</label>
+            <input type="password" id="openaiKey" placeholder="Enter your OpenAI API key">
+        </div>
+        <button id="saveSettings" class="button secondary">Save Settings</button>
+    </div>
+
+    <button id="summarizeBtn" class="button primary" disabled>
+        Summarize This Page
+    </button>
+
+    <!-- Info message appears right after summarize button -->
     <div id="info" class="info" style="display: none;"></div>
 
-    <!-- Category Confirmation UI -->
+    <!-- Category Confirmation UI - Moved here for better flow -->
     <div id="categoryConfirm" class="category-confirm">
         <div class="category-label">🤖 Detected Category:</div>
         <div id="categoryDisplay" class="category-display"></div>
@@ -291,22 +309,6 @@
             <button id="changeCategory" class="change-btn">✏️ Change</button>
         </div>
     </div>
-
-    <button id="connectNotion" class="button secondary">
-        Connect to Notion
-    </button>
-
-    <div class="settings">
-        <div class="input-group">
-            <label for="openaiKey">OpenAI API Key</label>
-            <input type="password" id="openaiKey" placeholder="Enter your OpenAI API key">
-        </div>
-        <button id="saveSettings" class="button secondary">Save Settings</button>
-    </div>
-
-    <button id="summarizeBtn" class="button primary" disabled>
-        Summarize This Page
-    </button>
 
     <div id="success" class="success" style="display: none;"></div>
 

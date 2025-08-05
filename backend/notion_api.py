@@ -671,27 +671,27 @@ class NotionAPI:
                         {
                             "type": "text",
                             "text": {
-                                "content": f"📂 {category}"
+                                "content": f"{emoji} {category}"
                             }
                         }
                     ]
                 }
             },
             "children": [
-                {
-                    "object": "block",
-                    "type": "heading_1",
-                    "heading_1": {
-                        "rich_text": [
-                            {
-                                "type": "text",
-                                "text": {
-                                    "content": f"{emoji} {category}"
-                                }
-                            }
-                        ]
-                    }
-                },
+                # {
+                #     "object": "block",
+                #     "type": "heading_1",
+                #     "heading_1": {
+                #         "rich_text": [
+                #             {
+                #                 "type": "text",
+                #                 "text": {
+                #                     "content": f"{emoji} {category}"
+                #                 }
+                #             }
+                #         ]
+                #     }
+                # },
                 {
                     "object": "block",
                     "type": "paragraph",
