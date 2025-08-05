@@ -647,13 +647,27 @@ class SummarizeItPopup {
                 throw new Error('Please enter your OpenAI API key in settings');
             }
 
-            // Summarize using OpenAI (client-side)
-            const summary = await this.summarizeWithOpenAI(content, openaiKey);
+            // Show category detection status
+            this.showMessage('🤖 Analyzing content and detecting category...', 'info');
 
-            // Save to Notion via backend
-            const notionPageUrl = await this.saveToNotion(summary, tab.url, tab.title);
+            // Summarize and categorize using OpenAI via backend
+            const summaryData = await this.summarizeAndCategorizeWithBackend(content, tab.title, openaiKey);
 
-            this.showSuccessWithLink('Article summarized and saved to Notion!', notionPageUrl);
+            // Show detected category to user with option to change
+            const finalCategory = await this.showCategoryConfirmation(summaryData.category);
+
+            // Save to Notion via backend with category
+            const notionPageUrl = await this.saveToNotionWithCategory(
+                summaryData.summary,
+                tab.url,
+                tab.title,
+                finalCategory
+            );
+
+            this.showSuccessWithLink(
+                `Article summarized and saved to Notion under "${finalCategory}" category!`,
+                notionPageUrl
+            );
 
         } catch (error) {
             console.error('Error summarizing page:', error);
@@ -728,6 +742,73 @@ class SummarizeItPopup {
         }
     }
 
+    async summarizeAndCategorizeWithBackend(content, title, openaiKey) {
+        try {
+            const response = await fetch(`${this.backendUrl}/summarize-and-categorize`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    content: content,
+                    title: title || 'Untitled',
+                    openai_api_key: openaiKey
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to summarize and categorize content');
+            }
+
+            const data = await response.json();
+            return {
+                summary: data.summary,
+                category: data.category
+            };
+
+        } catch (error) {
+            throw new Error(`Failed to process content: ${error.message}`);
+        }
+    }
+
+    async showCategoryConfirmation(detectedCategory) {
+        return new Promise((resolve) => {
+            // Show the detected category with option to change
+            const categoryDisplay = document.getElementById('categoryDisplay');
+            const categoryConfirm = document.getElementById('categoryConfirm');
+            const categorySelect = document.getElementById('categorySelect');
+            const confirmBtn = document.getElementById('confirmCategory');
+            const changeBtn = document.getElementById('changeCategory');
+
+            // Set detected category
+            categoryDisplay.textContent = detectedCategory;
+            categorySelect.value = detectedCategory;
+
+            // Show confirmation UI
+            categoryConfirm.style.display = 'block';
+
+            // Handle confirm button
+            const handleConfirm = () => {
+                categoryConfirm.style.display = 'none';
+                confirmBtn.removeEventListener('click', handleConfirm);
+                changeBtn.removeEventListener('click', handleChange);
+                resolve(categorySelect.value);
+            };
+
+            // Handle change button
+            const handleChange = () => {
+                categorySelect.style.display = 'block';
+                changeBtn.textContent = 'Confirm';
+                changeBtn.removeEventListener('click', handleChange);
+                changeBtn.addEventListener('click', handleConfirm);
+            };
+
+            confirmBtn.addEventListener('click', handleConfirm);
+            changeBtn.addEventListener('click', handleChange);
+        });
+    }
+
     async saveToNotion(summary, url, title) {
         try {
             const response = await fetch(`${this.backendUrl}/notion/save`, {
@@ -751,6 +832,36 @@ class SummarizeItPopup {
             const data = await response.json();
             console.log('Saved to Notion:', data.page_url);
             return data.page_url; // Return the page URL
+
+        } catch (error) {
+            throw new Error(`Failed to save to Notion: ${error.message}`);
+        }
+    }
+
+    async saveToNotionWithCategory(summary, url, title, category) {
+        try {
+            const response = await fetch(`${this.backendUrl}/notion/save`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    summary: summary,
+                    url: url,
+                    title: title,
+                    user_id: this.userId,
+                    category: category
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to save to Notion');
+            }
+
+            const data = await response.json();
+            console.log('Saved to Notion with category:', category, data.page_url);
+            return data.page_url;
 
         } catch (error) {
             throw new Error(`Failed to save to Notion: ${error.message}`);
@@ -795,13 +906,15 @@ class SummarizeItPopup {
         loadingElement.style.display = show ? 'block' : 'none';
     }
 
-    showMessage(message, type) {
+    showMessage(message, type = 'info') {
         const errorElement = document.getElementById('error');
         const successElement = document.getElementById('success');
+        const infoElement = document.getElementById('info'); // Added info element
 
-        // Hide both elements
+        // Hide all message types
         errorElement.style.display = 'none';
         successElement.style.display = 'none';
+        infoElement.style.display = 'none'; // Hide info element
 
         // Show the appropriate message
         if (type === 'error') {
@@ -810,12 +923,21 @@ class SummarizeItPopup {
         } else if (type === 'success') {
             successElement.textContent = message;
             successElement.style.display = 'block';
+        } else if (type === 'info') { // Added info message handling
+            infoElement.textContent = message;
+            infoElement.style.display = 'block';
         }
 
         // Auto-hide success messages after 3 seconds
         if (type === 'success') {
             setTimeout(() => {
                 successElement.style.display = 'none';
+            }, 3000);
+        }
+        // Auto-hide info messages after 3 seconds
+        if (type === 'info') {
+            setTimeout(() => {
+                infoElement.style.display = 'none';
             }, 3000);
         }
     }

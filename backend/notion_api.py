@@ -176,6 +176,179 @@ class NotionAPI:
         except requests.exceptions.RequestException as e:
             raise Exception(f"Failed to create Notion page: {str(e)}")
 
+    async def create_categorized_page(
+        self,
+        access_token: str,
+        workspace_id: str,
+        title: str,
+        content: str,
+        url: str,
+        category: str
+    ) -> str:
+        """Create a new page in Notion workspace organized by category"""
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Notion-Version": self.version,
+            "Content-Type": "application/json"
+        }
+
+        # Get or create the SummarizeIt Dashboard parent page
+        parent_page = await self._get_or_create_parent_page(access_token, headers)
+
+        # Get or create the category section within the dashboard
+        category_page = await self._get_or_create_category_page(access_token, headers, parent_page["id"], category)
+
+        # Create emoji based on category
+        category_emojis = {
+            "Technology & AI": "🤖",
+            "Sports": "⚽",
+            "Business & Finance": "💼",
+            "Health & Medicine": "🏥",
+            "Science": "🔬",
+            "Politics": "🏛️",
+            "Entertainment": "🎬",
+            "Education": "📚",
+            "Travel & Lifestyle": "✈️",
+            "General News": "📰"
+        }
+        emoji = category_emojis.get(category, "📰")
+
+        # Create the page content structure as a child page under the category
+        page_data = {
+            "parent": {
+                "type": "page_id",
+                "page_id": category_page["id"]
+            },
+            "properties": {
+                "title": {
+                    "title": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": f"{emoji} {title}"
+                            }
+                        }
+                    ]
+                }
+            },
+            "children": [
+                {
+                    "object": "block",
+                    "type": "callout",
+                    "callout": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": f"Category: {category}"
+                                }
+                            }
+                        ],
+                        "icon": {
+                            "emoji": emoji
+                        },
+                        "color": "blue_background"
+                    }
+                },
+                {
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": f"🔗 Original Article: "
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": url,
+                                    "link": {
+                                        "url": url
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "object": "block",
+                    "type": "divider",
+                    "divider": {}
+                },
+                {
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": "📝 Summary"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": content
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "object": "block",
+                    "type": "divider",
+                    "divider": {}
+                },
+                {
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": f"📅 Summarized on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+                                },
+                                "annotations": {
+                                    "italic": True,
+                                    "color": "gray"
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+
+        # Create the page
+        create_response = requests.post(
+            f"{self.base_url}/pages",
+            headers=headers,
+            json=page_data
+        )
+
+        if create_response.status_code != 200:
+            raise Exception(f"Failed to create categorized page: {create_response.text}")
+
+        new_page = create_response.json()
+        page_url = new_page.get("url", "")
+
+        print(f"Created categorized page in category '{category}': {page_url}")
+        return page_url
+
     def _split_into_points(self, content: str) -> list:
         """Split content into bullet points"""
         # Split by common bullet point indicators
@@ -439,4 +612,119 @@ class NotionAPI:
         new_page = response.json()
 
         return new_page
+
+    async def _get_or_create_category_page(self, access_token: str, headers: Dict[str, str], parent_page_id: str, category: str) -> Dict[str, Any]:
+        """Get or create a category page within the SummarizeIt Dashboard"""
+
+        # First, get the children of the parent page to see if category page exists
+        children_response = requests.get(
+            f"{self.base_url}/blocks/{parent_page_id}/children",
+            headers=headers
+        )
+
+        if children_response.status_code != 200:
+            raise Exception(f"Failed to get parent page children: {children_response.text}")
+
+        children_data = children_response.json()
+
+        # Look for existing category page
+        for child in children_data.get("results", []):
+            if child.get("type") == "child_page":
+                child_page_response = requests.get(
+                    f"{self.base_url}/pages/{child['id']}",
+                    headers=headers
+                )
+
+                if child_page_response.status_code == 200:
+                    page_data = child_page_response.json()
+                    title_property = page_data.get("properties", {}).get("title", {})
+                    title_content = title_property.get("title", [])
+
+                    if title_content and len(title_content) > 0:
+                        page_title = title_content[0].get("text", {}).get("content", "")
+                        if page_title == f"📂 {category}":
+                            return page_data
+
+        # Category page doesn't exist, create it
+        category_emojis = {
+            "Technology & AI": "🤖",
+            "Sports": "⚽",
+            "Business & Finance": "💼",
+            "Health & Medicine": "🏥",
+            "Science": "🔬",
+            "Politics": "🏛️",
+            "Entertainment": "🎬",
+            "Education": "📚",
+            "Travel & Lifestyle": "✈️",
+            "General News": "📰"
+        }
+        emoji = category_emojis.get(category, "📰")
+
+        category_page_data = {
+            "parent": {
+                "type": "page_id",
+                "page_id": parent_page_id
+            },
+            "properties": {
+                "title": {
+                    "title": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": f"📂 {category}"
+                            }
+                        }
+                    ]
+                }
+            },
+            "children": [
+                {
+                    "object": "block",
+                    "type": "heading_1",
+                    "heading_1": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": f"{emoji} {category}"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": f"Articles related to {category.lower()} will appear below:"
+                                },
+                                "annotations": {
+                                    "italic": True
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "object": "block",
+                    "type": "divider",
+                    "divider": {}
+                }
+            ]
+        }
+
+        create_response = requests.post(
+            f"{self.base_url}/pages",
+            headers=headers,
+            json=category_page_data
+        )
+
+        if create_response.status_code != 200:
+            raise Exception(f"Failed to create category page: {create_response.text}")
+
+        return create_response.json()
 

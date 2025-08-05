@@ -8,6 +8,7 @@ class NotionSaveRequest(BaseModel):
     url: str
     title: str
     user_id: str
+    category: Optional[str] = "General News"  # Category for smart organization
 
 class NotionSaveResponse(BaseModel):
     """Response model for Notion save"""
@@ -40,3 +41,15 @@ class SummarizeRequest(BaseModel):
 class SummarizeResponse(BaseModel):
     """Response model for summarization"""
     summary: str
+    category: Optional[str] = None  # Auto-detected category
+
+class SummarizeAndCategorizeRequest(BaseModel):
+    """Request model for content summarization with categorization"""
+    content: str
+    title: str
+    openai_api_key: str
+
+class SummarizeAndCategorizeResponse(BaseModel):
+    """Response model for summarization with categorization"""
+    summary: str
+    category: str

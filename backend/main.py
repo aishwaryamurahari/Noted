@@ -7,7 +7,10 @@ import requests
 import json
 from datetime import datetime
 
-from models import NotionSaveRequest, AuthResponse, SummarizeRequest, SummarizeResponse
+from models import (
+    NotionSaveRequest, AuthResponse, SummarizeRequest, SummarizeResponse,
+    SummarizeAndCategorizeRequest, SummarizeAndCategorizeResponse
+)
 from notion_oauth import NotionOAuth
 from notion_api import NotionAPI
 from storage import TokenStorage
@@ -208,20 +211,21 @@ async def notion_callback(code: str, state: Optional[str] = None):
 
 @app.post("/notion/save")
 async def save_to_notion(request: NotionSaveRequest):
-    """Save summary to user's Notion workspace"""
+    """Save summary to user's Notion workspace with smart categorization"""
     try:
         # Get user's access token
         token_data = token_storage.get_token(request.user_id)
         if not token_data:
             raise HTTPException(status_code=401, detail="User not authenticated with Notion")
 
-        # Create page in Notion
-        page_url = await notion_api.create_page(
+        # Create page in Notion with category organization
+        page_url = await notion_api.create_categorized_page(
             access_token=token_data["access_token"],
             workspace_id=token_data["workspace_id"],
             title=f"Summary - {request.title}",
             content=request.summary,
-            url=request.url
+            url=request.url,
+            category=request.category or "General News"
         )
 
         return {"page_url": page_url}
@@ -246,6 +250,36 @@ async def summarize_content(request: SummarizeRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate summary: {str(e)}")
+
+@app.post("/summarize-and-categorize")
+async def summarize_and_categorize_content(request: SummarizeAndCategorizeRequest):
+    """Summarize content and automatically categorize it using OpenAI"""
+    try:
+        # Set the OpenAI API key for this request
+        openai_summarizer.set_api_key(request.openai_api_key)
+
+        # Create summary and category using OpenAI
+        result = await openai_summarizer.summarize_and_categorize(
+            content=request.content,
+            title=request.title,
+            max_length=None  # Use default max_tokens
+        )
+
+        return SummarizeAndCategorizeResponse(
+            summary=result["summary"],
+            category=result["category"]
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate summary and category: {str(e)}")
+
+@app.get("/categories")
+async def get_available_categories():
+    """Get list of available categories for articles"""
+    return {
+        "categories": list(openai_summarizer.categories.keys()),
+        "descriptions": openai_summarizer.categories
+    }
 
 @app.get("/user/{user_id}/status")
 async def get_user_status(user_id: str):

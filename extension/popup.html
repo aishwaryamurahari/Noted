@@ -124,7 +124,7 @@
             opacity: 0.9;
         }
 
-        .input-group input {
+        .input-group input, .input-group select {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -137,6 +137,11 @@
 
         .input-group input::placeholder {
             color: rgba(255, 255, 255, 0.6);
+        }
+
+        .input-group select option {
+            background: #333;
+            color: white;
         }
 
         .error {
@@ -153,6 +158,16 @@
             background: rgba(34, 197, 94, 0.2);
             border: 1px solid rgba(34, 197, 94, 0.3);
             color: #86efac;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+
+        .info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
             padding: 10px;
             border-radius: 8px;
             margin-bottom: 15px;
@@ -179,13 +194,69 @@
         .refresh-btn:hover {
             opacity: 1;
         }
+
+        .category-confirm {
+            display: none;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .category-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .category-display {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #86efac;
+        }
+
+        .category-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .category-actions button {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .confirm-btn {
+            background: #22c55e;
+            color: white;
+        }
+
+        .confirm-btn:hover {
+            background: #16a34a;
+        }
+
+        .change-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .change-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>SummarizeIt</h1>
         <p style="margin: 5px 0; opacity: 0.8; font-size: 14px;">
-            Summarize articles and save to Notion
+            Summarize articles and save to Notion with smart categorization
         </p>
     </div>
 
@@ -197,6 +268,29 @@
     </div>
 
     <div id="error" class="error" style="display: none;"></div>
+    <div id="info" class="info" style="display: none;"></div>
+
+    <!-- Category Confirmation UI -->
+    <div id="categoryConfirm" class="category-confirm">
+        <div class="category-label">🤖 Detected Category:</div>
+        <div id="categoryDisplay" class="category-display"></div>
+        <select id="categorySelect" style="display: none; margin-bottom: 10px;">
+            <option value="Technology & AI">🤖 Technology & AI</option>
+            <option value="Sports">⚽ Sports</option>
+            <option value="Business & Finance">💼 Business & Finance</option>
+            <option value="Health & Medicine">🏥 Health & Medicine</option>
+            <option value="Science">🔬 Science</option>
+            <option value="Politics">🏛️ Politics</option>
+            <option value="Entertainment">🎬 Entertainment</option>
+            <option value="Education">📚 Education</option>
+            <option value="Travel & Lifestyle">✈️ Travel & Lifestyle</option>
+            <option value="General News">📰 General News</option>
+        </select>
+        <div class="category-actions">
+            <button id="confirmCategory" class="confirm-btn">✓ Confirm</button>
+            <button id="changeCategory" class="change-btn">✏️ Change</button>
+        </div>
+    </div>
 
     <button id="connectNotion" class="button secondary">
         Connect to Notion
