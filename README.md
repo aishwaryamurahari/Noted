@@ -6,17 +6,44 @@ A full-stack Chrome Extension that lets users summarize web articles and save th
 
 - **Chrome Extension**: Extract article content from any webpage
 - **OpenAI Integration**: Summarize articles using GPT-3.5 (client-side)
+- **Smart Categorization**: Automatically categorize articles into predefined topics using AI
 - **Notion OAuth**: Secure connection to user's Notion workspace
 - **FastAPI Backend**: RESTful API for handling OAuth and Notion operations
 - **SQLite Storage**: Secure storage of user access tokens
 - **Modern UI**: Clean, responsive popup interface
+- **Category Organization**: Organize saved articles by topic in Notion
 
 ## Architecture
 
-- **OpenAI API**: Called directly from the Chrome extension (client-side)
+- **OpenAI API**: Called directly from the Chrome extension (client-side) for summarization and categorization
 - **OpenAI API Key**: Stored securely in Chrome extension storage
-- **Backend**: Handles only Notion OAuth and page creation
+- **Backend**: Handles Notion OAuth, page creation, and category organization
+- **AI Categorization**: Intelligent article categorization using predefined topic categories
 - **Security**: OAuth tokens stored in SQLite database
+
+## Smart Categorization
+
+The extension features an intelligent categorization system that automatically organizes your saved articles by topic. When you summarize an article, the AI analyzes the content and assigns it to the most appropriate category.
+
+### Available Categories
+
+- **Technology & AI**: Articles about technology, artificial intelligence, software, programming, cybersecurity, and digital innovation
+- **Sports**: Sports news, games, athletes, fitness, and sports-related content
+- **Business & Finance**: Business news, finance, economics, markets, entrepreneurship, and corporate affairs
+- **Health & Medicine**: Health, medical research, wellness, healthcare, mental health, and medical breakthroughs
+- **Science**: Scientific research, discoveries, space, environment, climate, and academic studies
+- **Politics**: Political news, government, policy, elections, international relations, and civic affairs
+- **Entertainment**: Movies, TV shows, music, celebrities, gaming, and entertainment industry news
+- **Education**: Educational content, learning, academic institutions, and educational technology
+- **Travel & Lifestyle**: Travel, lifestyle, culture, food, fashion, and personal development
+- **General News**: General news articles that don't fit into specific categories
+
+### How It Works
+
+1. **Automatic Detection**: The AI analyzes article content and title to determine the best category
+2. **User Confirmation**: You can review and change the suggested category before saving
+3. **Notion Organization**: Articles are saved to your Notion workspace with proper category organization
+4. **Consistent Tagging**: Ensures your articles are systematically organized for easy retrieval
 
 ## Project Structure
 
@@ -130,9 +157,11 @@ The API will be available at `http://localhost:8000`
 3. Click "Summarize This Page"
 4. The extension will:
    - Extract the article content
-   - Send it to OpenAI for summarization (client-side)
-   - Save the summary to your Notion workspace via backend
-5. You'll see a success message when complete
+   - Send it to OpenAI for summarization and categorization (client-side)
+   - Display the detected category for your confirmation
+   - Allow you to change the category if needed
+   - Save the summary to your Notion workspace via backend with proper categorization
+5. You'll see a success message when complete, and the article will be organized under the appropriate category in Notion
 
 ## API Endpoints
 
@@ -141,7 +170,12 @@ The API will be available at `http://localhost:8000`
 - `GET /auth/notion/callback` - Handle OAuth callback
 
 ### Notion Operations
-- `POST /notion/save` - Save summary to Notion
+- `POST /notion/save` - Save summary to Notion with category organization
+
+### Summarization & Categorization
+- `POST /summarize` - Summarize content using OpenAI
+- `POST /summarize-and-categorize` - Summarize and categorize content automatically
+- `GET /categories` - Get available categories and their descriptions
 
 ### User Management
 - `GET /user/{user_id}/status` - Check user connection status
@@ -153,6 +187,7 @@ The API will be available at `http://localhost:8000`
 - **CORS**: Proper CORS configuration for Chrome extension
 - **Input Validation**: Pydantic models for request validation
 - **Client-side OpenAI**: API key stored securely in Chrome storage
+- **Category Privacy**: Categorization happens client-side with secure API communication
 
 ## Development
 
@@ -173,7 +208,8 @@ The Chrome extension uses Manifest V3 with:
 - **Content Scripts**: Page content extraction
 - **Chrome Storage**: Secure local storage for API keys
 - **Chrome Scripting API**: Dynamic script injection
-- **Direct OpenAI API**: Client-side summarization
+- **Direct OpenAI API**: Client-side summarization and categorization
+- **Category UI**: Interactive category confirmation and selection interface
 
 ## Troubleshooting
 
@@ -183,6 +219,7 @@ The Chrome extension uses Manifest V3 with:
 2. **Notion Connection Failed**: Check your Notion OAuth credentials
 3. **OpenAI API Errors**: Verify your OpenAI API key is correct and stored in the extension
 4. **Content Extraction Issues**: The extension tries multiple strategies to extract content
+5. **Category Detection Issues**: If categorization fails, the article defaults to "General News"
 
 ### Debug Mode
 
