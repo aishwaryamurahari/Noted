@@ -1,0 +1,7 @@
+.env
+tokens.db
+path/
+venv/
+__pycache__/
+ENVIRONMENT_SETUP.md
+env.example

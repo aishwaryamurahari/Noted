@@ -1,0 +1,209 @@
+# SummarizeIt - Chrome Extension with FastAPI Backend
+
+A full-stack Chrome Extension that lets users summarize web articles and save them to their own Notion workspace using OpenAI GPT-3.5.
+
+## Features
+
+- **Chrome Extension**: Extract article content from any webpage
+- **OpenAI Integration**: Summarize articles using GPT-3.5 (client-side)
+- **Notion OAuth**: Secure connection to user's Notion workspace
+- **FastAPI Backend**: RESTful API for handling OAuth and Notion operations
+- **SQLite Storage**: Secure storage of user access tokens
+- **Modern UI**: Clean, responsive popup interface
+
+## Architecture
+
+- **OpenAI API**: Called directly from the Chrome extension (client-side)
+- **OpenAI API Key**: Stored securely in Chrome extension storage
+- **Backend**: Handles only Notion OAuth and page creation
+- **Security**: OAuth tokens stored in SQLite database
+
+## Project Structure
+
+```
+SummarizeIt/
+├── backend/                 # FastAPI backend
+│   ├── main.py             # FastAPI entry point
+│   ├── models.py           # Pydantic models
+│   ├── config.py           # Configuration management
+│   ├── storage.py          # SQLite token storage
+│   ├── notion_oauth.py     # Notion OAuth handler
+│   ├── notion_api.py       # Notion API operations
+│   ├── requirements.txt    # Python dependencies
+│   └── env.example        # Environment variables template
+├── extension/              # Chrome Extension
+│   ├── manifest.json      # Extension manifest
+│   ├── popup.html        # Extension popup UI
+│   ├── popup.js          # Popup functionality
+│   ├── content.js        # Content script
+│   └── background.js     # Service worker
+└── README.md             # This file
+```
+
+## Setup Instructions
+
+### 1. Backend Setup
+
+#### Prerequisites
+- Python 3.8+
+- pip
+
+#### Installation
+
+1. Navigate to the backend directory:
+```bash
+cd backend
+```
+
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Set up environment variables:
+```bash
+cp env.example .env
+```
+
+Edit `.env` with your actual values:
+```env
+# Notion OAuth Configuration
+NOTION_CLIENT_ID=your_notion_client_id_here
+NOTION_CLIENT_SECRET=your_notion_client_secret_here
+NOTION_REDIRECT_URI=http://localhost:8000/auth/notion/callback
+
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+
+# Security
+SECRET_KEY=your-secret-key-change-this-in-production
+```
+
+5. Start the backend server:
+```bash
+python main.py
+```
+
+The API will be available at `http://localhost:8000`
+
+### 2. Notion OAuth Setup
+
+1. Go to [Notion Developers](https://developers.notion.com/)
+2. Create a new integration
+3. Set the redirect URI to `http://localhost:8000/auth/notion/callback`
+4. Copy the Client ID and Client Secret to your `.env` file
+
+### 3. Chrome Extension Setup
+
+1. Open Chrome and go to `chrome://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked"
+4. Select the `extension` folder
+5. The extension should now appear in your extensions list
+
+## Usage
+
+### 1. Connect to Notion
+
+1. Click the SummarizeIt extension icon
+2. Click "Connect to Notion"
+3. Authorize the application in Notion
+4. You'll be redirected back and see a success message
+
+### 2. Configure OpenAI API Key
+
+1. Get an OpenAI API key from [OpenAI Platform](https://platform.openai.com/)
+2. In the extension popup, enter your API key in the settings section
+3. Click "Save Settings"
+
+### 3. Summarize Articles
+
+1. Navigate to any article you want to summarize
+2. Click the SummarizeIt extension icon
+3. Click "Summarize This Page"
+4. The extension will:
+   - Extract the article content
+   - Send it to OpenAI for summarization (client-side)
+   - Save the summary to your Notion workspace via backend
+5. You'll see a success message when complete
+
+## API Endpoints
+
+### Authentication
+- `GET /auth/notion/login` - Redirect to Notion OAuth
+- `GET /auth/notion/callback` - Handle OAuth callback
+
+### Notion Operations
+- `POST /notion/save` - Save summary to Notion
+
+### User Management
+- `GET /user/{user_id}/status` - Check user connection status
+
+## Security Features
+
+- **OAuth 2.0**: Secure Notion authentication
+- **Token Storage**: Encrypted storage of access tokens
+- **CORS**: Proper CORS configuration for Chrome extension
+- **Input Validation**: Pydantic models for request validation
+- **Client-side OpenAI**: API key stored securely in Chrome storage
+
+## Development
+
+### Backend Development
+
+The backend uses FastAPI with the following key components:
+
+- **FastAPI**: Modern, fast web framework
+- **SQLite**: Lightweight database for token storage
+- **Pydantic**: Data validation and settings management
+- **Requests**: HTTP client for external APIs
+
+### Extension Development
+
+The Chrome extension uses Manifest V3 with:
+
+- **Service Worker**: Background processing
+- **Content Scripts**: Page content extraction
+- **Chrome Storage**: Secure local storage for API keys
+- **Chrome Scripting API**: Dynamic script injection
+- **Direct OpenAI API**: Client-side summarization
+
+## Troubleshooting
+
+### Common Issues
+
+1. **CORS Errors**: Ensure the backend is running on `http://localhost:8000`
+2. **Notion Connection Failed**: Check your Notion OAuth credentials
+3. **OpenAI API Errors**: Verify your OpenAI API key is correct and stored in the extension
+4. **Content Extraction Issues**: The extension tries multiple strategies to extract content
+
+### Debug Mode
+
+Enable Chrome DevTools for the extension:
+1. Go to `chrome://extensions/`
+2. Find SummarizeIt
+3. Click "Details"
+4. Click "Inspect views: popup"
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.
+
+## Support
+
+For issues and questions, please create an issue in the repository.
