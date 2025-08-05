@@ -6,7 +6,7 @@ class SummarizeItPopup {
         this.init();
     }
 
-            async init() {
+    async init() {
         this.bindEvents();
         await this.loadSettings();
         this.generateUserId();
@@ -19,10 +19,9 @@ class SummarizeItPopup {
         if (!backendConnected) {
             console.log('Backend not accessible, showing disconnected state');
             const statusElement = document.getElementById('status');
-            const summarizeBtn = document.getElementById('summarizeBtn');
             statusElement.className = 'status disconnected';
             statusElement.textContent = '❌ Backend not accessible';
-            summarizeBtn.disabled = true;
+            await this.updateUIState();
             return;
         }
 
@@ -42,6 +41,9 @@ class SummarizeItPopup {
 
         // Set up periodic status check
         this.setupStatusCheck();
+
+        // Final UI state update to ensure everything is properly configured
+        await this.updateUIState();
 
         console.log('=== INITIALIZATION COMPLETE ===');
     }
@@ -245,19 +247,19 @@ class SummarizeItPopup {
             console.log('Connection data:', data);
 
             const statusElement = document.getElementById('status');
-            const summarizeBtn = document.getElementById('summarizeBtn');
 
             if (data.connected) {
                 statusElement.className = 'status connected';
                 statusElement.textContent = `✅ Connected to Notion`;
-                summarizeBtn.disabled = false;
                 console.log('UI updated to connected state');
             } else {
                 statusElement.className = 'status disconnected';
                 statusElement.textContent = '❌ Not connected to Notion';
-                summarizeBtn.disabled = true;
                 console.log('UI updated to disconnected state');
             }
+
+            // Update UI state after refreshing connection status
+            await this.updateUIState();
         } catch (error) {
             console.error('Error refreshing UI:', error);
         }
@@ -314,7 +316,6 @@ class SummarizeItPopup {
 
         // Force UI update
         const statusElement = document.getElementById('status');
-        const summarizeBtn = document.getElementById('summarizeBtn');
 
         // Check if the user is actually connected
         try {
@@ -325,14 +326,15 @@ class SummarizeItPopup {
             if (data.connected) {
                 statusElement.className = 'status connected';
                 statusElement.textContent = `✅ Connected to Notion`;
-                summarizeBtn.disabled = false;
                 console.log('UI updated to connected state');
             } else {
                 statusElement.className = 'status disconnected';
                 statusElement.textContent = '❌ Not connected to Notion';
-                summarizeBtn.disabled = true;
                 console.log('UI updated to disconnected state');
             }
+
+            // Update UI state after setting user ID
+            await this.updateUIState();
         } catch (error) {
             console.error('Error in final connection check:', error);
         }
@@ -357,10 +359,9 @@ class SummarizeItPopup {
 
                 // Also update the UI immediately
                 const statusElement = document.getElementById('status');
-                const summarizeBtn = document.getElementById('summarizeBtn');
                 statusElement.className = 'status connected';
                 statusElement.textContent = `✅ Connected to Notion`;
-                summarizeBtn.disabled = false;
+                await this.updateUIState();
             } else {
                 this.showMessage('Backend shows user is NOT connected', 'error');
             }
@@ -408,9 +409,8 @@ class SummarizeItPopup {
             await chrome.storage.sync.set({ openaiApiKey: openaiKey });
             this.showMessage('Settings saved successfully!', 'success');
 
-            // Refresh Notion connection status after saving settings
-            await this.checkNotionConnection();
-            await this.updateSaveSettingsVisibility(); // Refresh visibility after saving
+            // Update UI state after saving settings
+            await this.updateUIState();
         } catch (error) {
             console.error('Error saving settings:', error);
             this.showMessage('Failed to save settings', 'error');
@@ -495,16 +495,14 @@ class SummarizeItPopup {
         }
     }
 
-    showConnectedState() {
+    async showConnectedState() {
         const statusElement = document.getElementById('status');
-        const summarizeBtn = document.getElementById('summarizeBtn');
 
         statusElement.className = 'status connected';
         statusElement.textContent = `✅ Connected to Notion`;
-        summarizeBtn.disabled = false;
 
-        // Check if OpenAI key is saved and hide Save Settings if everything is configured
-        this.updateSaveSettingsVisibility();
+        // Update UI state (includes summarize button and save settings visibility)
+        await this.updateUIState();
 
         // Show success message only if this is a new connection
         const wasConnected = statusElement.getAttribute('data-was-connected') === 'true';
@@ -514,20 +512,15 @@ class SummarizeItPopup {
         }
     }
 
-    showDisconnectedState(reason = 'Not connected to Notion') {
+    async showDisconnectedState(reason = 'Not connected to Notion') {
         const statusElement = document.getElementById('status');
-        const summarizeBtn = document.getElementById('summarizeBtn');
 
         statusElement.className = 'status disconnected';
         statusElement.textContent = `❌ ${reason}`;
-        summarizeBtn.disabled = true;
         statusElement.setAttribute('data-was-connected', 'false');
 
-        // Show Save Settings button when disconnected
-        const saveSettingsBtn = document.getElementById('saveSettings');
-        if (saveSettingsBtn) {
-            saveSettingsBtn.style.display = 'block';
-        }
+        // Update UI state (includes summarize button and save settings visibility)
+        await this.updateUIState();
 
         // Clear OpenAI API key when disconnected from Notion
         this.clearStoredSettings();
@@ -896,11 +889,13 @@ class SummarizeItPopup {
         const statusElement = document.getElementById('status');
 
         if (openaiKeyInput && saveSettingsBtn && statusElement) {
-            const openaiKey = openaiKeyInput.value;
+            // Check if OpenAI key is actually saved in storage (not just typed)
+            const result = await chrome.storage.sync.get(['openaiApiKey']);
+            const savedOpenaiKey = result.openaiApiKey;
             const isConnectedToNotion = statusElement.className.includes('connected');
 
-            // Hide Save Settings button if both Notion is connected AND OpenAI key is provided
-            if (openaiKey.trim() && isConnectedToNotion) {
+            // Hide Save Settings button only if both Notion is connected AND OpenAI key is SAVED
+            if (savedOpenaiKey && savedOpenaiKey.trim() && isConnectedToNotion) {
                 saveSettingsBtn.style.display = 'none';
                 console.log('Save Settings button hidden - fully configured');
             } else {
@@ -908,6 +903,37 @@ class SummarizeItPopup {
                 console.log('Save Settings button shown - configuration needed');
             }
         }
+    }
+
+    async updateUIState() {
+        const statusElement = document.getElementById('status');
+        const summarizeBtn = document.getElementById('summarizeBtn');
+
+        if (!statusElement || !summarizeBtn) return;
+
+        const isConnectedToNotion = statusElement.className.includes('connected');
+
+        // Check if OpenAI key is saved
+        const result = await chrome.storage.sync.get(['openaiApiKey']);
+        const savedOpenaiKey = result.openaiApiKey;
+        const hasOpenaiKey = savedOpenaiKey && savedOpenaiKey.trim();
+
+        // Enable summarize button only if BOTH conditions are met
+        if (isConnectedToNotion && hasOpenaiKey) {
+            summarizeBtn.disabled = false;
+            console.log('Summarize button enabled - both Notion and OpenAI configured');
+        } else {
+            summarizeBtn.disabled = true;
+            if (!isConnectedToNotion) {
+                console.log('Summarize button disabled - Notion not connected');
+            }
+            if (!hasOpenaiKey) {
+                console.log('Summarize button disabled - OpenAI key not saved');
+            }
+        }
+
+        // Update save settings visibility
+        await this.updateSaveSettingsVisibility();
     }
 }
 

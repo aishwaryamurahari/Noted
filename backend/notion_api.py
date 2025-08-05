@@ -384,20 +384,20 @@ class NotionAPI:
                 }
             },
             "children": [
-                {
-                    "object": "block",
-                    "type": "heading_1",
-                    "heading_1": {
-                        "rich_text": [
-                            {
-                                "type": "text",
-                                "text": {
-                                    "content": "📚 SummarizeIt Dashboard"
-                                }
-                            }
-                        ]
-                    }
-                },
+                # {
+                #     "object": "block",
+                #     "type": "heading_1",
+                #     "heading_1": {
+                #         "rich_text": [
+                #             {
+                #                 "type": "text",
+                #                 "text": {
+                #                     "content": "📚 SummarizeIt Dashboard"
+                #                 }
+                #             }
+                #         ]
+                #     }
+                # },
                 {
                     "object": "block",
                     "type": "paragraph",
