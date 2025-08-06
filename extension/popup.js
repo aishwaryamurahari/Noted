@@ -1,8 +1,9 @@
-// Popup script for SummarizeIt Chrome Extension
-class SummarizeItPopup {
+// Popup script for Noted Chrome Extension
+class NotedPopup {
     constructor() {
         this.backendUrl = 'http://localhost:8000';
         this.userId = null;
+        this.backendConnected = false;
         this.init();
     }
 
@@ -19,8 +20,12 @@ class SummarizeItPopup {
         if (!backendConnected) {
             console.log('Backend not accessible, showing disconnected state');
             const statusElement = document.getElementById('status');
+            const refreshBtn = document.getElementById('refreshStatus');
             statusElement.className = 'status disconnected';
             statusElement.textContent = '❌ Backend not accessible';
+            // Ensure refresh button is visible for backend connection issues
+            statusElement.style.display = 'block';
+            refreshBtn.style.display = 'block';
             await this.updateUIState();
             return;
         }
@@ -54,15 +59,36 @@ class SummarizeItPopup {
             const response = await fetch(`${this.backendUrl}/`);
             if (response.ok) {
                 console.log('Backend is accessible');
+                this.backendConnected = true;
                 return true;
             } else {
                 console.log('Backend returned error:', response.status);
+                this.backendConnected = false;
                 return false;
             }
         } catch (error) {
             console.error('Backend connection failed:', error);
+            this.backendConnected = false;
             return false;
         }
+    }
+
+    async checkAllConnections() {
+        console.log('=== CHECKING ALL CONNECTIONS ===');
+
+        // Test backend connection first
+        const backendConnected = await this.testBackendConnection();
+        if (!backendConnected) {
+            console.log('Backend not accessible, showing disconnected state');
+            const statusElement = document.getElementById('status');
+            statusElement.className = 'status disconnected';
+            statusElement.textContent = '❌ Backend not accessible';
+            await this.updateUIState();
+            return;
+        }
+
+        // If backend is accessible, check Notion connection
+        await this.checkNotionConnection();
     }
 
     bindEvents() {
@@ -87,8 +113,8 @@ class SummarizeItPopup {
             this.updateSaveSettingsVisibility();
         });
 
-        document.getElementById('refreshStatus').addEventListener('click', () => {
-            this.checkNotionConnection();
+        document.getElementById('refreshStatus').addEventListener('click', async () => {
+            await this.checkAllConnections();
         });
 
 
@@ -282,10 +308,10 @@ class SummarizeItPopup {
                 const ctx = canvas.getContext('2d');
                 ctx.textBaseline = 'top';
                 ctx.font = '14px Arial';
-                ctx.fillText('SummarizeIt User', 2, 2);
+                ctx.fillText('Noted User', 2, 2);
 
                 const fingerprint = canvas.toDataURL();
-                const extensionId = chrome.runtime.id || 'summarizeit';
+                const extensionId = chrome.runtime.id || 'noted';
 
                 this.userId = btoa(fingerprint + extensionId).substring(0, 16);
                 console.log('Generated temporary User ID:', this.userId);
@@ -497,9 +523,11 @@ class SummarizeItPopup {
 
     async showConnectedState() {
         const statusElement = document.getElementById('status');
+        const refreshBtn = document.getElementById('refreshStatus');
 
-        statusElement.className = 'status connected';
-        statusElement.textContent = `✅ Connected to Notion`;
+        // Hide the status element and refresh button when connected
+        statusElement.style.display = 'none';
+        refreshBtn.style.display = 'none';
 
         // Update UI state (includes summarize button and save settings visibility)
         await this.updateUIState();
@@ -514,7 +542,11 @@ class SummarizeItPopup {
 
     async showDisconnectedState(reason = 'Not connected to Notion') {
         const statusElement = document.getElementById('status');
+        const refreshBtn = document.getElementById('refreshStatus');
 
+        // Show the status element and refresh button when disconnected
+        statusElement.style.display = 'block';
+        refreshBtn.style.display = 'block';
         statusElement.className = 'status disconnected';
         statusElement.textContent = `❌ ${reason}`;
         statusElement.setAttribute('data-was-connected', 'false');
@@ -549,7 +581,7 @@ class SummarizeItPopup {
     setupStatusCheck() {
         // Check status every 3 seconds while popup is open
         this.statusInterval = setInterval(async () => {
-            await this.checkNotionConnection();
+            await this.checkAllConnections();
         }, 3000);
 
         // Check connection when popup gains focus (user returns from OAuth)
@@ -557,7 +589,7 @@ class SummarizeItPopup {
             console.log('Popup gained focus - checking connection status');
             await this.checkOAuthCompletion();
             await this.checkForConnectedUsers();
-            await this.checkNotionConnection();
+            await this.checkAllConnections();
         });
 
         // Check connection when popup becomes visible again
@@ -566,7 +598,7 @@ class SummarizeItPopup {
                 console.log('Popup became visible - checking connection status');
                 await this.checkOAuthCompletion();
                 await this.checkForConnectedUsers();
-                await this.checkNotionConnection();
+                await this.checkAllConnections();
             }
         });
 
@@ -801,6 +833,7 @@ class SummarizeItPopup {
             const categorySelect = document.getElementById('categorySelect');
             const confirmBtn = document.getElementById('confirmCategory');
             const changeBtn = document.getElementById('changeCategory');
+            const cancelBtn = document.getElementById('cancelCategory');
 
             // Set detected category
             categoryDisplay.textContent = detectedCategory;
@@ -808,8 +841,12 @@ class SummarizeItPopup {
 
             // Reset UI state
             categorySelect.style.display = 'none';
-            confirmBtn.textContent = '✓ Confirm Category';
-            changeBtn.textContent = '✏️ Change';
+            confirmBtn.textContent = 'Confirm Category';
+            changeBtn.textContent = 'Change';
+
+            // Ensure correct button visibility
+            changeBtn.style.display = 'block';
+            cancelBtn.style.display = 'none';
 
             // Show confirmation UI
             categoryConfirm.style.display = 'block';
@@ -833,9 +870,13 @@ class SummarizeItPopup {
                 isInChangeMode = true;
                 categorySelect.style.display = 'block';
 
+                // Show/hide buttons appropriately
+                changeBtn.style.display = 'none';
+                cancelBtn.style.display = 'block';
+
                 // Change button texts
                 confirmBtn.textContent = '✓ Confirm Selection';
-                changeBtn.textContent = '✖ Cancel';
+                cancelBtn.textContent = '✖ Cancel';
 
                 // Remove old event listeners
                 confirmBtn.removeEventListener('click', handleInitialConfirm);
@@ -843,8 +884,9 @@ class SummarizeItPopup {
 
                 // Add new event listeners
                 confirmBtn.addEventListener('click', handleNewCategoryConfirm);
-                changeBtn.addEventListener('click', handleCancel);
+                cancelBtn.addEventListener('click', handleCancel);
             };
+            // Handle
 
             // Handle confirm button when in change mode (confirm new selection)
             const handleNewCategoryConfirm = () => {
@@ -868,10 +910,16 @@ class SummarizeItPopup {
             // Cleanup function to remove all event listeners and hide UI
             const cleanup = () => {
                 categoryConfirm.style.display = 'none';
+
+                // Reset button visibility to initial state
+                changeBtn.style.display = 'block';
+                cancelBtn.style.display = 'none';
+
+                // Remove all event listeners
                 confirmBtn.removeEventListener('click', handleInitialConfirm);
                 confirmBtn.removeEventListener('click', handleNewCategoryConfirm);
                 changeBtn.removeEventListener('click', handleChange);
-                changeBtn.removeEventListener('click', handleCancel);
+                cancelBtn.removeEventListener('click', handleCancel);
             };
 
             // Set up initial event listeners
@@ -1033,15 +1081,15 @@ class SummarizeItPopup {
         const linkContainer = document.createElement('div');
         linkContainer.style.marginTop = '8px';
         linkContainer.style.padding = '8px';
-        linkContainer.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+        linkContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
         linkContainer.style.borderRadius = '4px';
-        linkContainer.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+        linkContainer.style.border = '1px solid rgba(0, 0, 0, 0.1)';
 
         // Create the link text
         const linkText = document.createElement('div');
         linkText.textContent = '🔗 View in Notion';
         linkText.style.fontSize = '12px';
-        linkText.style.color = 'rgba(255, 255, 255, 0.8)';
+        linkText.style.color = '#374151';
         linkText.style.marginBottom = '4px';
 
         // Create the clickable link
@@ -1049,7 +1097,7 @@ class SummarizeItPopup {
         linkElement.href = notionUrl;
         linkElement.textContent = 'Open Saved Summary';
         linkElement.target = '_blank';
-        linkElement.style.color = '#FFFFFF';
+        linkElement.style.color = '#2563eb';
         linkElement.style.textDecoration = 'none';
         linkElement.style.fontWeight = 'bold';
         linkElement.style.fontSize = '13px';
@@ -1060,7 +1108,7 @@ class SummarizeItPopup {
 
         // Add hover effect
         linkElement.addEventListener('mouseenter', () => {
-            linkElement.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            linkElement.style.backgroundColor = 'rgba(37, 99, 235, 0.1)';
         });
         linkElement.addEventListener('mouseleave', () => {
             linkElement.style.backgroundColor = 'transparent';
@@ -1106,8 +1154,9 @@ class SummarizeItPopup {
     async updateUIState() {
         const statusElement = document.getElementById('status');
         const summarizeBtn = document.getElementById('summarizeBtn');
+        const connectNotionBtn = document.getElementById('connectNotion');
 
-        if (!statusElement || !summarizeBtn) return;
+        if (!statusElement || !summarizeBtn || !connectNotionBtn) return;
 
         const isConnectedToNotion = statusElement.className.includes('connected');
 
@@ -1116,18 +1165,34 @@ class SummarizeItPopup {
         const savedOpenaiKey = result.openaiApiKey;
         const hasOpenaiKey = savedOpenaiKey && savedOpenaiKey.trim();
 
-        // Enable summarize button only if BOTH conditions are met
-        if (isConnectedToNotion && hasOpenaiKey) {
+        // Enable summarize button only if ALL THREE conditions are met
+        if (this.backendConnected && isConnectedToNotion && hasOpenaiKey) {
             summarizeBtn.disabled = false;
-            console.log('Summarize button enabled - both Notion and OpenAI configured');
+            console.log('Summarize button enabled - backend, Notion, and OpenAI all configured');
         } else {
             summarizeBtn.disabled = true;
+            if (!this.backendConnected) {
+                console.log('Summarize button disabled - backend not accessible');
+            }
             if (!isConnectedToNotion) {
                 console.log('Summarize button disabled - Notion not connected');
             }
             if (!hasOpenaiKey) {
                 console.log('Summarize button disabled - OpenAI key not saved');
             }
+        }
+
+        // Disable Connect to Notion button if already connected
+        if (isConnectedToNotion) {
+            connectNotionBtn.disabled = true;
+            connectNotionBtn.textContent = '✅ Connected to Notion';
+            connectNotionBtn.classList.add('connected');
+            console.log('Connect to Notion button disabled - already connected');
+        } else {
+            connectNotionBtn.disabled = false;
+            connectNotionBtn.textContent = 'Connect to Notion';
+            connectNotionBtn.classList.remove('connected');
+            console.log('Connect to Notion button enabled - not connected');
         }
 
         // Update save settings visibility
@@ -1137,5 +1202,5 @@ class SummarizeItPopup {
 
 // Initialize the popup when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new SummarizeItPopup();
+    new NotedPopup();
 });

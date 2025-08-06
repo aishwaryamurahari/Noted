@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SummarizeIt",
+  "name": "Noted",
   "version": "1.0.0",
   "description": "Summarize web articles and save them to your Notion workspace",
   "permissions": [
@@ -18,7 +18,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "SummarizeIt",
+    "default_title": "Noted",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

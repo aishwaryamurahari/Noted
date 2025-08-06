@@ -17,7 +17,7 @@ from storage import TokenStorage
 from openai_summarizer import OpenAISummarizer
 from config import settings
 
-app = FastAPI(title="SummarizeIt Backend", version="1.0.0")
+app = FastAPI(title="Noted Backend", version="1.0.0")
 
 # Add CORS middleware for Chrome extension
 app.add_middleware(
@@ -82,7 +82,7 @@ async def debug_config():
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    return {"message": "SummarizeIt Backend is running"}
+    return {"message": "Noted Backend is running"}
 
 @app.get("/auth/notion/login")
 async def notion_login():
@@ -165,7 +165,7 @@ async def notion_callback(code: str, state: Optional[str] = None):
         </head>
         <body>
             <div class="success">✅ Successfully Connected to Notion!</div>
-            <div class="message">You can now close this window and return to the SummarizeIt extension.</div>
+            <div class="message">You can now close this window and return to the Noted extension.</div>
             <div class="message">Make sure to enter your OpenAI API key in the extension settings.</div>
             <div class="user-id">User ID: {user_id}</div>
             <div id="user-id" style="display: none;">{user_id}</div>
@@ -222,7 +222,7 @@ async def save_to_notion(request: NotionSaveRequest):
         page_url = await notion_api.create_categorized_page(
             access_token=token_data["access_token"],
             workspace_id=token_data["workspace_id"],
-            title=f"Summary - {request.title}",
+            title=f"{request.title}",
             content=request.summary,
             url=request.url,
             category=request.category or "General News"

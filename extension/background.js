@@ -1,4 +1,4 @@
-// Background service worker for SummarizeIt Chrome Extension
+// Background service worker for Noted Chrome Extension
 
 // Store OAuth state
 let oauthState = {
@@ -10,7 +10,7 @@ let oauthState = {
 // Handle extension installation
 chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
-        console.log('SummarizeIt extension installed');
+        console.log('Noted extension installed');
     }
 });
 
@@ -31,7 +31,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 // Handle errors
 chrome.runtime.onSuspend.addListener(() => {
-    console.log('SummarizeIt extension suspended');
+    console.log('Noted extension suspended');
 });
 
 // Monitor for OAuth completion by checking backend status
@@ -84,7 +84,7 @@ async function checkOAuthCompletion() {
             chrome.notifications.create({
                 type: 'basic',
                 iconUrl: 'icons/icon128.png',
-                title: 'SummarizeIt',
+                title: 'Noted',
                 message: 'Successfully connected to Notion!'
             });
         } else {

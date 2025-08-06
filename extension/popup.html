@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SummarizeIt</title>
+    <title>Noted</title>
     <style>
         body {
             width: 350px;
@@ -11,8 +11,8 @@
             margin: 0;
             padding: 20px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: white;
+            color: #333;
         }
 
         .header {
@@ -66,18 +66,31 @@
         }
 
         .button.secondary {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
         }
 
         .button.secondary:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: #e5e7eb;
         }
 
         .button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        .button.secondary:disabled {
+            background: #e5e7eb;
+            color: #9ca3af;
+            border: 1px solid #d1d5db;
+        }
+
+        .button.secondary.connected:disabled {
+            background: #22c55e !important;
+            color: white !important;
+            border: 1px solid #16a34a !important;
+            opacity: 1 !important;
         }
 
         .button.small {
@@ -93,8 +106,8 @@
         }
 
         .spinner {
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top: 2px solid white;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-top: 2px solid #2563eb;
             border-radius: 50%;
             width: 20px;
             height: 20px;
@@ -110,7 +123,7 @@
         .settings {
             margin-top: 20px;
             padding-top: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
         }
 
         .input-group {
@@ -127,27 +140,27 @@
         .input-group input, .input-group select {
             width: 100%;
             padding: 8px 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(0, 0, 0, 0.2);
             border-radius: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
+            background: #f9fafb;
+            color: #333;
             font-size: 14px;
             box-sizing: border-box;
         }
 
         .input-group input::placeholder {
-            color: rgba(255, 255, 255, 0.6);
+            color: rgba(0, 0, 0, 0.5);
         }
 
         .input-group select option {
-            background: #333;
-            color: white;
+            background: white;
+            color: #333;
         }
 
         .error {
-            background: rgba(239, 68, 68, 0.2);
+            background: rgba(239, 68, 68, 0.1);
             border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
+            color: #dc2626;
             padding: 10px;
             border-radius: 8px;
             margin-bottom: 15px;
@@ -157,7 +170,7 @@
         .success {
             background: rgba(34, 197, 94, 0.2);
             border: 1px solid rgba(34, 197, 94, 0.3);
-            color: #86efac;
+            color: black;
             padding: 10px;
             border-radius: 8px;
             margin-bottom: 15px;
@@ -167,7 +180,7 @@
         .info {
             background: rgba(59, 130, 246, 0.2);
             border: 1px solid rgba(59, 130, 246, 0.3);
-            color: #93c5fd;
+            color: white;
             padding: 10px;
             border-radius: 8px;
             margin-bottom: 15px;
@@ -208,13 +221,14 @@
             font-size: 12px;
             opacity: 0.9;
             margin-bottom: 8px;
+            color: #374151;
         }
 
         .category-display {
             font-size: 16px;
             font-weight: 600;
             margin-bottom: 10px;
-            color: #86efac;
+            color: black;
         }
 
         .category-actions {
@@ -232,31 +246,47 @@
             transition: all 0.2s ease;
         }
 
-        .confirm-btn {
-            background: #22c55e;
-            color: white;
+        .category-actions .confirm-btn {
+            background: #2563eb !important;
+            color: white !important;
+            border: none !important;
         }
 
-        .confirm-btn:hover {
-            background: #16a34a;
+        .category-actions .confirm-btn:hover {
+            background: #2563eb !important;
         }
 
-        .change-btn {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+        .category-actions .change-btn {
+            background: #2563eb !important;
+            color: white !important;
+            border: none !important;
         }
 
-        .change-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
+
+        .category-actions .change-btn:hover {
+            background: #1d4ed8 !important;
+        }
+
+        .category-actions #cancelCategory {
+            background: #dc2626 !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .category-actions #cancelCategory:hover {
+            background: #b91c1c !important;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>SummarizeIt</h1>
+        <h1 style="display: flex; align-items: center; justify-content: center; gap: 12px; margin: 0;">
+            <img src="icons/noted-logo.png" style="height: 40px;" alt="Noted">
+            <span style="color: #2563eb;">Noted</span>
+        </h1>
+        <!-- <img src="icons/noted-logo.png" alt="Noted" style="height: 40px; margin-bottom: 8px;"> -->
         <p style="margin: 5px 0; opacity: 0.8; font-size: 14px;">
-            Summarize articles and save to Notion with smart categorization
+            All your clipped and condensed content in one place.
         </p>
     </div>
 
@@ -307,6 +337,7 @@
         <div class="category-actions">
             <button id="confirmCategory" class="confirm-btn">✓ Confirm</button>
             <button id="changeCategory" class="change-btn">✏️ Change</button>
+            <button id="cancelCategory" class="change-btn" style="display: none;">✖ Cancel</button>
         </div>
     </div>
 

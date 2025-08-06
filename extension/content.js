@@ -1,4 +1,4 @@
-// Content script for SummarizeIt Chrome Extension
+// Content script for Noted Chrome Extension
 // This script runs on every page to extract readable content
 
 (function() {
@@ -112,5 +112,5 @@
     // Expose function globally for debugging
     window.extractReadableContent = extractReadableContent;
 
-    console.log('SummarizeIt content script loaded');
+    console.log('Noted content script loaded');
 })();

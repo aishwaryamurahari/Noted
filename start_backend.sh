@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# SummarizeIt Backend Startup Script
+# Noted Backend Startup Script
 
-echo "Starting SummarizeIt Backend..."
+echo "Starting Noted Backend..."
 
 # Check if we're in the right directory
 if [ ! -f "backend/main.py" ]; then

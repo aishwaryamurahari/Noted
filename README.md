@@ -1,4 +1,4 @@
-# SummarizeIt - Chrome Extension with FastAPI Backend
+# Noted - Chrome Extension with FastAPI Backend
 
 A full-stack Chrome Extension that lets users summarize web articles and save them to their own Notion workspace using OpenAI GPT-3.5.
 
@@ -48,7 +48,7 @@ The extension features an intelligent categorization system that automatically o
 ## Project Structure
 
 ```
-SummarizeIt/
+Noted/
 ├── backend/                 # FastAPI backend
 │   ├── main.py             # FastAPI entry point
 │   ├── models.py           # Pydantic models
@@ -139,7 +139,7 @@ The API will be available at `http://localhost:8000`
 
 ### 1. Connect to Notion
 
-1. Click the SummarizeIt extension icon
+1. Click the Noted extension icon
 2. Click "Connect to Notion"
 3. Authorize the application in Notion
 4. You'll be redirected back and see a success message
@@ -153,7 +153,7 @@ The API will be available at `http://localhost:8000`
 ### 3. Summarize Articles
 
 1. Navigate to any article you want to summarize
-2. Click the SummarizeIt extension icon
+2. Click the Noted extension icon
 3. Click "Summarize This Page"
 4. The extension will:
    - Extract the article content
@@ -225,7 +225,7 @@ The Chrome extension uses Manifest V3 with:
 
 Enable Chrome DevTools for the extension:
 1. Go to `chrome://extensions/`
-2. Find SummarizeIt
+2. Find Noted
 3. Click "Details"
 4. Click "Inspect views: popup"
 

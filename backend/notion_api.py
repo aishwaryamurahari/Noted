@@ -18,7 +18,7 @@ class NotionAPI:
         content: str,
         url: str
     ) -> str:
-        """Create a new page in Notion workspace under SummarizeIt Dashboard"""
+        """Create a new page in Notion workspace under Noted Dashboard"""
 
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -26,10 +26,10 @@ class NotionAPI:
             "Content-Type": "application/json"
         }
 
-        # Get or create the SummarizeIt Dashboard parent page
+        # Get or create the Noted Dashboard parent page
         parent_page = await self._get_or_create_parent_page(access_token, headers)
 
-        # Create the page content structure as a child page under SummarizeIt Dashboard
+        # Create the page content structure as a child page under Noted Dashboard
         page_data = {
             "parent": {
                 "type": "page_id",
@@ -74,7 +74,7 @@ class NotionAPI:
                             {
                                 "type": "text",
                                 "text": {
-                                    "content": "📋 Summary"
+                                    "content": "📋 Note"
                                 }
                             }
                         ]
@@ -193,7 +193,7 @@ class NotionAPI:
             "Content-Type": "application/json"
         }
 
-        # Get or create the SummarizeIt Dashboard parent page
+        # Get or create the Noted Dashboard parent page
         parent_page = await self._get_or_create_parent_page(access_token, headers)
 
         # Get or create the category section within the dashboard
@@ -287,7 +287,7 @@ class NotionAPI:
                             {
                                 "type": "text",
                                 "text": {
-                                    "content": "📝 Summary"
+                                    "content": "📝 Note"
                                 }
                             }
                         ]
@@ -320,7 +320,7 @@ class NotionAPI:
                             {
                                 "type": "text",
                                 "text": {
-                                    "content": f"📅 Summarized on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+                                    "content": f"📅 Saved on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
                                 },
                                 "annotations": {
                                     "italic": True,
@@ -506,11 +506,11 @@ class NotionAPI:
             raise Exception(f"Failed to update page: {str(e)}")
 
     async def _get_or_create_parent_page(self, access_token: str, headers: Dict[str, str]) -> Dict[str, Any]:
-        """Get or create a parent page for SummarizeIt summaries"""
+        """Get or create a parent page for Noted summaries"""
 
-        # First, search for existing SummarizeIt parent page
+        # First, search for existing Noted parent page
         search_data = {
-            "query": "SummarizeIt Dashboard",
+            "query": "Noted Dashboard",
             "filter": {
                 "property": "object",
                 "value": "page"
@@ -535,7 +535,7 @@ class NotionAPI:
                 if title_property.get("title") and len(title_property["title"]) > 0:
                     page_title = title_property["title"][0].get("text", {}).get("content", "")
 
-            if page_title == "SummarizeIt Dashboard":
+            if page_title == "Noted Dashboard":
                 return page
 
         # If no parent page found, create one
@@ -550,7 +550,7 @@ class NotionAPI:
                         {
                             "type": "text",
                             "text": {
-                                "content": "SummarizeIt Dashboard"
+                                "content": "Noted Dashboard"
                             }
                         }
                     ]
@@ -565,7 +565,7 @@ class NotionAPI:
                 #             {
                 #                 "type": "text",
                 #                 "text": {
-                #                     "content": "📚 SummarizeIt Dashboard"
+                                    #                     "content": "📚 Noted Dashboard"
                 #                 }
                 #             }
                 #         ]
@@ -579,7 +579,7 @@ class NotionAPI:
                             {
                                 "type": "text",
                                 "text": {
-                                    "content": "Welcome to your SummarizeIt dashboard! This page contains your summarized articles and web content."
+                                    "content": "Never lose a highlight — it’s Noted!"
                                 }
                             }
                         ]
@@ -593,7 +593,7 @@ class NotionAPI:
                             {
                                 "type": "text",
                                 "text": {
-                                    "content": "📄 Each article summary is saved as a separate page under this dashboard for easy reading and organization."
+                                    "content": "📄 Each article note is saved as a separate page under this dashboard for easy reading and organization."
                                 }
                             }
                         ]
@@ -614,7 +614,7 @@ class NotionAPI:
         return new_page
 
     async def _get_or_create_category_page(self, access_token: str, headers: Dict[str, str], parent_page_id: str, category: str) -> Dict[str, Any]:
-        """Get or create a category page within the SummarizeIt Dashboard"""
+        """Get or create a category page within the Noted Dashboard"""
 
         # First, get the children of the parent page to see if category page exists
         children_response = requests.get(
