@@ -48,17 +48,17 @@ async def check_oauth_completion():
         from storage import TokenStorage
         import sqlite3
         import os
-        
+
         # Ensure the directory exists for the database
         db_dir = "/tmp"
         if not os.path.exists(db_dir):
             os.makedirs(db_dir)
-        
+
         token_storage = TokenStorage()
         users = token_storage.list_users()
         has_users = len(users) > 0
         latest_user_id = users[-1] if users else None
-        
+
         return {
             "has_users": has_users,
             "latest_user_id": latest_user_id,
@@ -80,7 +80,7 @@ async def notion_login():
         from notion_oauth import NotionOAuth
         notion_oauth = NotionOAuth()
 
-        auth_url = notion_oauth.get_authorization_url()
+        auth_url = notion_oauth.get_auth_url()
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=auth_url)
     except Exception as e:
