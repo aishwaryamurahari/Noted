@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # Notion OAuth Configuration
     NOTION_CLIENT_ID: str = os.getenv("NOTION_CLIENT_ID", "")
     NOTION_CLIENT_SECRET: str = os.getenv("NOTION_CLIENT_SECRET", "")
-    NOTION_REDIRECT_URI: str = os.getenv("NOTION_REDIRECT_URI", "http://localhost:8000/auth/notion/callback")
+    NOTION_REDIRECT_URI: str = os.getenv("NOTION_REDIRECT_URI", "https://noted-six.vercel.app/auth/notion/callback")
 
     # Server Configuration
     HOST: str = os.getenv("HOST", "0.0.0.0")

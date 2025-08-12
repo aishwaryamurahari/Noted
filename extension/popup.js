@@ -1,7 +1,7 @@
 // Popup script for Noted Chrome Extension
 class NotedPopup {
     constructor() {
-        this.backendUrl = 'https://noted-aishwarya-muraharis-projects.vercel.app';
+        this.backendUrl = 'https://noted-six.vercel.app';
         this.userId = null;
         this.backendConnected = false;
         this.init();

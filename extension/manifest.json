@@ -14,7 +14,7 @@
   ],
   "host_permissions": [
     "<all_urls>",
-    "https://noted-aishwarya-muraharis-projects.vercel.app/*"
+    "https://noted-six.vercel.app/*"
   ],
   "action": {
     "default_popup": "popup.html",

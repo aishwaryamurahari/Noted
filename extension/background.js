@@ -42,14 +42,14 @@ async function checkOAuthCompletion() {
 
     try {
         // Check if OAuth completion occurred by checking for new users
-        const response = await fetch(`https://noted-aishwarya-muraharis-projects.vercel.app/oauth/check-completion`);
+        const response = await fetch(`https://noted-six.vercel.app/oauth/check-completion`);
         const completionData = await response.json();
 
                         let connectedUserId = null;
                 if (completionData.has_users && completionData.latest_user_id) {
                     // Check if this user is connected
                     try {
-                        const userResponse = await fetch(`https://noted-aishwarya-muraharis-projects.vercel.app/user/${completionData.latest_user_id}/status`);
+                        const userResponse = await fetch(`https://noted-six.vercel.app/user/${completionData.latest_user_id}/status`);
                         const userData = await userResponse.json();
 
                         if (userData.connected) {
