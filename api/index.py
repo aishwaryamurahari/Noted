@@ -80,7 +80,7 @@ def notion_callback(code: str, state: str = None):
         # For now, just store the code and mark as successful
     # Will implement full OAuth token exchange later
     user_id = f"user_{code[:8]}"
-    
+
     try:
         # Simple in-memory storage for testing
         TEMP_TOKEN_STORAGE[user_id] = {
@@ -90,7 +90,7 @@ def notion_callback(code: str, state: str = None):
         }
         storage_success = True
         storage_message = f"Authorization code stored for user: {user_id}"
-        
+
     except Exception as e:
         storage_success = False
         storage_message = f"Storage error: {str(e)}"
@@ -127,6 +127,26 @@ def notion_callback(code: str, state: str = None):
     """
 
     return HTMLResponse(content=html_content)
+
+@app.get("/user/{user_id}/status")
+def get_user_status(user_id: str):
+    """Get user connection status"""
+    # Check if user exists in our storage
+    if user_id in TEMP_TOKEN_STORAGE:
+        user_data = TEMP_TOKEN_STORAGE[user_id]
+        return {
+            "connected": True,
+            "user_id": user_id,
+            "status": user_data.get("status", "authorized"),
+            "stored_at": user_data.get("stored_at"),
+            "storage_type": "in_memory"
+        }
+    else:
+        return {
+            "connected": False,
+            "user_id": user_id,
+            "error": "User not found in storage"
+        }
 
 @app.get("/test/imports")
 def test_imports():
