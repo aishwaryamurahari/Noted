@@ -14,7 +14,7 @@
   ],
   "host_permissions": [
     "<all_urls>",
-    "http://localhost:8000/*"
+    "https://noted-aishwarya-muraharis-projects.vercel.app/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -42,10 +42,5 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "web_accessible_resources": [
-    {
-      "resources": ["popup.html", "settings.html"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  "web_accessible_resources": []
 }
