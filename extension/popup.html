@@ -82,8 +82,17 @@
 
         .button.secondary:disabled {
             background: #e5e7eb;
-            color: #9ca3af;
-            border: 1px solid #d1d5db;
+        }
+
+        .button.connecting {
+            background: #f59e0b !important;
+            color: white !important;
+            opacity: 0.8;
+        }
+
+        .button.connected {
+            background: #10b981 !important;
+            color: white !important;
         }
 
         .button.secondary.connected:disabled {
@@ -291,10 +300,10 @@
     </div>
 
     <div class="status-container">
-        <div id="status" class="status disconnected">
+        <div id="status" class="status disconnected" style="display: none;">
             Checking connection...
         </div>
-        <button id="refreshStatus" class="refresh-btn" title="Refresh connection status">↻</button>
+        <button id="refreshStatus" class="refresh-btn" title="Refresh connection status" style="display: none;">↻</button>
     </div>
 
     <div id="error" class="error" style="display: none;"></div>

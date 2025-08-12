@@ -25,7 +25,7 @@ source venv/bin/activate
 
 # Install dependencies
 echo "Installing dependencies..."
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 
 # Check if .env file exists
 if [ ! -f ".env" ]; then
@@ -40,4 +40,5 @@ echo "Server will be available at http://localhost:8000"
 echo "Press Ctrl+C to stop the server"
 echo ""
 
-python main.py
+# Use the virtual environment's python
+./venv/bin/python main.py

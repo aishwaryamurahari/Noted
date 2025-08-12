@@ -41,32 +41,24 @@ async function checkOAuthCompletion() {
     }
 
     try {
-        // First, check if any new users have been added (indicating OAuth completion)
-        const response = await fetch(`http://localhost:8000/debug/users`);
-        const usersData = await response.json();
+        // Check if OAuth completion occurred by checking for new users
+        const response = await fetch(`http://localhost:8000/oauth/check-completion`);
+        const completionData = await response.json();
 
-        console.log('Current users in backend:', usersData);
+                        let connectedUserId = null;
+                if (completionData.has_users && completionData.latest_user_id) {
+                    // Check if this user is connected
+                    try {
+                        const userResponse = await fetch(`http://localhost:8000/user/${completionData.latest_user_id}/status`);
+                        const userData = await userResponse.json();
 
-        // Get the current user ID from storage
-        const result = await chrome.storage.sync.get(['userId']);
-        const currentUserId = result.userId;
-
-        // Check if any user is connected
-        let connectedUserId = null;
-        for (const user of usersData.users) {
-            try {
-                const userResponse = await fetch(`http://localhost:8000/user/${user}/status`);
-                const userData = await userResponse.json();
-
-                if (userData.connected) {
-                    connectedUserId = user;
-                    console.log('Found connected user:', user);
-                    break;
+                        if (userData.connected) {
+                            connectedUserId = completionData.latest_user_id;
+                        }
+                    } catch (error) {
+                        console.error(`Error checking user ${completionData.latest_user_id}:`, error);
+                    }
                 }
-            } catch (error) {
-                console.error(`Error checking user ${user}:`, error);
-            }
-        }
 
         if (connectedUserId) {
             // OAuth completed successfully
@@ -77,8 +69,6 @@ async function checkOAuthCompletion() {
                 timestamp: Date.now()
             };
             oauthState.lastCheck = Date.now();
-
-            console.log('OAuth completed successfully:', oauthState.completionData);
 
             // Show notification
             chrome.notifications.create({

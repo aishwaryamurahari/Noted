@@ -27,16 +27,16 @@ The extension features an intelligent categorization system that automatically o
 
 ### Available Categories
 
-- **Technology & AI**: Articles about technology, artificial intelligence, software, programming, cybersecurity, and digital innovation
-- **Sports**: Sports news, games, athletes, fitness, and sports-related content
-- **Business & Finance**: Business news, finance, economics, markets, entrepreneurship, and corporate affairs
-- **Health & Medicine**: Health, medical research, wellness, healthcare, mental health, and medical breakthroughs
-- **Science**: Scientific research, discoveries, space, environment, climate, and academic studies
-- **Politics**: Political news, government, policy, elections, international relations, and civic affairs
-- **Entertainment**: Movies, TV shows, music, celebrities, gaming, and entertainment industry news
-- **Education**: Educational content, learning, academic institutions, and educational technology
-- **Travel & Lifestyle**: Travel, lifestyle, culture, food, fashion, and personal development
-- **General News**: General news articles that don't fit into specific categories
+- **Technology & AI**: Tech, AI, programming, cybersecurity
+- **Sports**: Sports news, fitness, athletes
+- **Business & Finance**: Business, finance, markets, economics
+- **Health & Medicine**: Health, medical research, wellness
+- **Science**: Research, discoveries, environment, space
+- **Politics**: Government, policy, elections, international affairs
+- **Entertainment**: Movies, TV, music, gaming, celebrities
+- **Education**: Learning, academic content, educational tech
+- **Travel & Lifestyle**: Travel, culture, food, fashion, personal development
+- **General News**: Articles that don't fit other categories
 
 ### How It Works
 
@@ -228,19 +228,3 @@ Enable Chrome DevTools for the extension:
 2. Find Noted
 3. Click "Details"
 4. Click "Inspect views: popup"
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
-
-## Support
-
-For issues and questions, please create an issue in the repository.

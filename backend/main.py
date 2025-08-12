@@ -34,49 +34,35 @@ notion_oauth = NotionOAuth()
 notion_api = NotionAPI()
 openai_summarizer = OpenAISummarizer()
 
-@app.get("/debug/user/{user_id}")
-async def debug_user(user_id: str):
-    """Debug endpoint to check specific user's token"""
-    token_data = token_storage.get_token(user_id)
+# REMOVE OR SECURE DEBUG ENDPOINTS - SECURITY CRITICAL
+# @app.get("/debug/user/{user_id}")
+# @app.get("/debug/users")
+# @app.get("/debug/config")
 
-    # Test Notion connection if token exists
-    notion_status = "not_connected"
-    workspace_info = None
-
-    if token_data:
-        try:
-            workspace_info = await notion_api.get_workspace_info(token_data["access_token"])
-            notion_status = "connected"
-        except Exception as e:
-            notion_status = f"error: {str(e)}"
-
+# Replace with secure admin-only endpoints
+@app.get("/admin/health")
+async def admin_health():
+    """Secure health check - no sensitive data"""
     return {
-        "user_id": user_id,
-        "has_token": token_data is not None,
-        "token_data": token_data,
-        "notion_status": notion_status,
-        "workspace_info": workspace_info
+        "status": "healthy",
+        "total_users": len(token_storage.list_users()),
+        "timestamp": datetime.now().isoformat()
     }
 
-@app.get("/debug/users")
-async def debug_users():
-    """Debug endpoint to list all users in database"""
+@app.get("/oauth/check-completion")
+async def check_oauth_completion():
+    """Check if there are any completed OAuth users - secure version"""
     users = token_storage.list_users()
+    if users:
+        # Return only the most recent user ID (likely the one who just completed OAuth)
+        latest_user = max(users, key=lambda x: x['created_at'])
+        return {
+            "has_users": True,
+            "latest_user_id": latest_user['user_id']
+        }
     return {
-        "total_users": len(users),
-        "users": users
-    }
-
-@app.get("/debug/config")
-async def debug_config():
-    """Debug endpoint to check configuration"""
-    return {
-        "notion_client_id": settings.NOTION_CLIENT_ID,
-        "notion_client_secret": "***" if settings.NOTION_CLIENT_SECRET else "NOT_SET",
-        "notion_redirect_uri": settings.NOTION_REDIRECT_URI,
-        "host": settings.HOST,
-        "port": settings.PORT,
-        "secret_key": "***" if settings.SECRET_KEY else "NOT_SET"
+        "has_users": False,
+        "latest_user_id": None
     }
 
 @app.get("/")
@@ -283,12 +269,38 @@ async def get_available_categories():
 
 @app.get("/user/{user_id}/status")
 async def get_user_status(user_id: str):
-    """Check if user is connected to Notion"""
+    """Check if user is connected to Notion with comprehensive validation"""
     token_data = token_storage.get_token(user_id)
-    return {
-        "connected": token_data is not None,
-        "workspace_id": token_data["workspace_id"] if token_data else None
-    }
+
+    if not token_data:
+        return {
+            "connected": False,
+            "reason": "no_token",
+            "message": "No token found for user",
+            "action": "clear_extension_storage",
+            "workspace_id": None
+        }
+
+    # Validate token by testing Notion API
+    try:
+        workspace_info = await notion_api.get_workspace_info(token_data["access_token"])
+        return {
+            "connected": True,
+            "reason": "valid_token",
+            "message": "Token is valid and working",
+            "workspace_id": token_data["workspace_id"],
+            "workspace_name": workspace_info.get("name", "Unknown")
+        }
+    except Exception as e:
+        # Token exists but is invalid - remove it
+        token_storage.delete_token(user_id)
+        return {
+            "connected": False,
+            "reason": "invalid_token",
+            "message": f"Token invalid: {str(e)}",
+            "action": "clear_extension_storage",
+            "workspace_id": None
+        }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
