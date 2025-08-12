@@ -53,24 +53,27 @@ async def check_oauth_completion():
         db_dir = "/tmp"
         if not os.path.exists(db_dir):
             os.makedirs(db_dir)
-
+        
         token_storage = TokenStorage()
         users = token_storage.list_users()
         has_users = len(users) > 0
         latest_user_id = users[-1] if users else None
-
+        
         return {
             "has_users": has_users,
             "latest_user_id": latest_user_id,
-            "total_users": len(users)
+            "total_users": len(users),
+            "status": "success"
         }
     except Exception as e:
-        # For now, return a working response for the extension
+        # Return fallback but try to be more informative
         return {
             "has_users": False,
             "latest_user_id": None,
             "total_users": 0,
-            "note": "Database temporarily unavailable - using fallback response"
+            "status": "database_error",
+            "error": str(e),
+            "note": "Using fallback response - database temporarily unavailable"
         }
 
 @app.get("/auth/notion/login")
@@ -91,7 +94,48 @@ def notion_callback(code: str, state: str = None):
     """Handle Notion OAuth callback"""
     from fastapi.responses import HTMLResponse
     
-    # Simple success page - will implement full OAuth later
+    try:
+        # Try to process the OAuth and store tokens
+        from notion_oauth import NotionOAuth
+        from notion_api import NotionAPI
+        from storage import TokenStorage
+        
+        notion_oauth = NotionOAuth()
+        notion_api = NotionAPI()
+        token_storage = TokenStorage()
+        
+        # Exchange code for access token
+        token_response = notion_oauth.exchange_code_for_token(code)
+        
+        if token_response and 'access_token' in token_response:
+            access_token = token_response['access_token']
+            
+            # Get user info from Notion
+            user_info = notion_api.get_user_info(access_token)
+            user_id = user_info.get('id') if user_info else f"temp_user_{code[:8]}"
+            
+            # Store the token (handle gracefully if storage fails)
+            try:
+                token_storage.store_token(user_id, access_token, token_response)
+                storage_success = True
+                storage_message = f"Token stored successfully for user: {user_id}"
+            except Exception as storage_error:
+                storage_success = False
+                storage_message = f"Token storage failed: {str(storage_error)}"
+                # Still continue to show success page
+            
+        else:
+            storage_success = False
+            storage_message = "Failed to exchange code for token"
+            user_id = "unknown"
+            
+    except Exception as e:
+        # If anything fails, still show a success page but note the issue
+        storage_success = False
+        storage_message = f"OAuth processing error: {str(e)}"
+        user_id = "unknown"
+    
+    # Success page with debug info
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -111,14 +155,16 @@ def notion_callback(code: str, state: str = None):
             <div class="success">✅ OAuth Authorization Received!</div>
             <div class="info">Your Noted extension received the authorization from Notion.</div>
             <div class="code-info">Auth Code: {code[:20] if len(code) > 20 else code}...</div>
+            <div class="code-info">User ID: {user_id}</div>
+            <div class="code-info">Storage: {"✅ Success" if storage_success else "❌ Failed"}</div>
+            <div class="info"><small>{storage_message}</small></div>
             <div class="info">You can now close this window and use the Noted extension.</div>
-            <div class="info"><small>Note: Full OAuth implementation coming soon!</small></div>
             <a href="#" onclick="window.close()" class="button">Close Window</a>
         </div>
     </body>
     </html>
     """
-    
+
     return HTMLResponse(content=html_content)
 
 @app.get("/test/imports")
