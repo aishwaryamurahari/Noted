@@ -16,6 +16,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 
+# Temporary in-memory storage for tokens (for testing)
+TEMP_TOKEN_STORAGE = {}
+
 app = FastAPI(title="Noted Backend", version="1.0.0")
 
 # Add CORS middleware for Chrome extension
@@ -43,38 +46,18 @@ def health_check():
 @app.get("/oauth/check-completion")
 async def check_oauth_completion():
     """Check if there are any completed OAuth users"""
-    try:
-        # Import storage only when needed
-        from storage import TokenStorage
-        import sqlite3
-        import os
-
-        # Ensure the directory exists for the database
-        db_dir = "/tmp"
-        if not os.path.exists(db_dir):
-            os.makedirs(db_dir)
-        
-        token_storage = TokenStorage()
-        users = token_storage.list_users()
-        has_users = len(users) > 0
-        latest_user_id = users[-1] if users else None
-        
-        return {
-            "has_users": has_users,
-            "latest_user_id": latest_user_id,
-            "total_users": len(users),
-            "status": "success"
-        }
-    except Exception as e:
-        # Return fallback but try to be more informative
-        return {
-            "has_users": False,
-            "latest_user_id": None,
-            "total_users": 0,
-            "status": "database_error",
-            "error": str(e),
-            "note": "Using fallback response - database temporarily unavailable"
-        }
+    # Use in-memory storage for now (for testing)
+    users = list(TEMP_TOKEN_STORAGE.keys())
+    has_users = len(users) > 0
+    latest_user_id = users[-1] if users else None
+    
+    return {
+        "has_users": has_users,
+        "latest_user_id": latest_user_id,
+        "total_users": len(users),
+        "status": "success",
+        "storage_type": "in_memory"
+    }
 
 @app.get("/auth/notion/login")
 async def notion_login():
@@ -93,48 +76,52 @@ async def notion_login():
 def notion_callback(code: str, state: str = None):
     """Handle Notion OAuth callback"""
     from fastapi.responses import HTMLResponse
-    
+
     try:
         # Try to process the OAuth and store tokens
         from notion_oauth import NotionOAuth
         from notion_api import NotionAPI
         from storage import TokenStorage
-        
+
         notion_oauth = NotionOAuth()
         notion_api = NotionAPI()
         token_storage = TokenStorage()
-        
+
         # Exchange code for access token
         token_response = notion_oauth.exchange_code_for_token(code)
-        
+
         if token_response and 'access_token' in token_response:
             access_token = token_response['access_token']
-            
+
             # Get user info from Notion
             user_info = notion_api.get_user_info(access_token)
             user_id = user_info.get('id') if user_info else f"temp_user_{code[:8]}"
-            
-            # Store the token (handle gracefully if storage fails)
+
+            # Store the token in memory for now (will work for testing)
             try:
-                token_storage.store_token(user_id, access_token, token_response)
+                # Store in memory
+                TEMP_TOKEN_STORAGE[user_id] = {
+                    "access_token": access_token,
+                    "token_response": token_response,
+                    "stored_at": datetime.now().isoformat()
+                }
                 storage_success = True
                 storage_message = f"Token stored successfully for user: {user_id}"
             except Exception as storage_error:
                 storage_success = False
                 storage_message = f"Token storage failed: {str(storage_error)}"
-                # Still continue to show success page
-            
+
         else:
             storage_success = False
             storage_message = "Failed to exchange code for token"
             user_id = "unknown"
-            
+
     except Exception as e:
         # If anything fails, still show a success page but note the issue
         storage_success = False
         storage_message = f"OAuth processing error: {str(e)}"
         user_id = "unknown"
-    
+
     # Success page with debug info
     html_content = f"""
     <!DOCTYPE html>
