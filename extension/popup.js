@@ -146,9 +146,13 @@ class NotedPopup {
             return;
         }
 
-        // DISABLED: Don't auto-check Notion connection on backend detection
-        // User must explicitly click "Connect to Notion" to authenticate
-        // await this.checkNotionConnection();
+        // Check for existing Notion connection on startup
+        // First, check if there's a recently completed OAuth (in case user ID changed)
+        const detectedNewUser = await this.detectRealUser();
+        if (!detectedNewUser) {
+            // If no new user detected, check current user connection
+            await this.checkNotionConnection();
+        }
     }
 
     bindEvents() {
