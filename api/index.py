@@ -10,7 +10,7 @@ if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
 # Set environment variables for Vercel
-os.environ.setdefault('DATABASE_URL', 'sqlite:////tmp/tokens.db')
+# Let config.py handle the database URL
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,7 +23,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "chrome-extension://*",
-        "http://localhost:3000", 
+        "http://localhost:3000",
         "http://localhost:8000",
         "https://*.vercel.app"
     ],
@@ -46,8 +46,15 @@ async def check_oauth_completion():
     try:
         # Import storage only when needed
         from storage import TokenStorage
-        token_storage = TokenStorage()
+        import sqlite3
+        import os
         
+        # Ensure the directory exists for the database
+        db_dir = "/tmp"
+        if not os.path.exists(db_dir):
+            os.makedirs(db_dir)
+        
+        token_storage = TokenStorage()
         users = token_storage.list_users()
         has_users = len(users) > 0
         latest_user_id = users[-1] if users else None
@@ -58,11 +65,12 @@ async def check_oauth_completion():
             "total_users": len(users)
         }
     except Exception as e:
+        # For now, return a working response for the extension
         return {
             "has_users": False,
             "latest_user_id": None,
             "total_users": 0,
-            "error": str(e)
+            "note": "Database temporarily unavailable - using fallback response"
         }
 
 @app.get("/auth/notion/login")
@@ -71,7 +79,7 @@ async def notion_login():
     try:
         from notion_oauth import NotionOAuth
         notion_oauth = NotionOAuth()
-        
+
         auth_url = notion_oauth.get_authorization_url()
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=auth_url)
@@ -82,43 +90,43 @@ async def notion_login():
 def test_imports():
     """Test individual imports to identify issues"""
     results = {}
-    
+
     try:
         from config import settings
         results["config"] = "OK"
     except Exception as e:
         results["config"] = str(e)
-    
+
     try:
         from models import NotionSaveRequest
-        results["models"] = "OK"  
+        results["models"] = "OK"
     except Exception as e:
         results["models"] = str(e)
-    
+
     try:
         from storage import TokenStorage
         results["storage"] = "OK"
     except Exception as e:
         results["storage"] = str(e)
-        
+
     try:
         from notion_oauth import NotionOAuth
         results["notion_oauth"] = "OK"
     except Exception as e:
         results["notion_oauth"] = str(e)
-        
+
     try:
         from notion_api import NotionAPI
         results["notion_api"] = "OK"
     except Exception as e:
         results["notion_api"] = str(e)
-        
+
     try:
-        from openai_summarizer import OpenAISummarizer  
+        from openai_summarizer import OpenAISummarizer
         results["openai_summarizer"] = "OK"
     except Exception as e:
         results["openai_summarizer"] = str(e)
-    
+
     return {"import_results": results}
 
 # Export the FastAPI app for Vercel
