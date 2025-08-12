@@ -87,63 +87,39 @@ async def notion_login():
         raise HTTPException(status_code=500, detail=f"Error generating auth URL: {str(e)}")
 
 @app.get("/auth/notion/callback")
-async def notion_callback(code: str, state: Optional[str] = None):
+def notion_callback(code: str, state: str = None):
     """Handle Notion OAuth callback"""
-    try:
-        # Progressive imports to avoid startup issues
-        from fastapi.responses import HTMLResponse
-        
-        # For now, return a simple success page while we fix the database
-        return HTMLResponse(f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Noted - Connection Successful</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f8f9fa; }}
-                .container {{ max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-                .success {{ color: #28a745; font-size: 24px; margin-bottom: 20px; }}
-                .info {{ color: #666; font-size: 16px; margin-bottom: 15px; }}
-                .button {{ background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 20px; }}
-                .code-info {{ background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; font-family: monospace; word-break: break-all; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="success">✅ OAuth Authorization Received!</div>
-                <div class="info">Your Noted extension received the authorization from Notion.</div>
-                <div class="code-info">Auth Code: {code[:20]}...</div>
-                <div class="info">You can now close this window and use the Noted extension.</div>
-                <div class="info"><small>Note: Token storage is being configured - full functionality coming soon!</small></div>
-                <a href="#" onclick="window.close()" class="button">Close Window</a>
-            </div>
-        </body>
-        </html>
-        """)
-        
-    except Exception as e:
-        from fastapi.responses import HTMLResponse
-        return HTMLResponse(f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Noted - Connection Error</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f8f9fa; }}
-                .container {{ max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-                .error {{ color: #dc3545; font-size: 24px; margin-bottom: 20px; }}
-                .info {{ color: #666; font-size: 16px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="error">❌ Connection Failed</div>
-                <div class="info">Error: {str(e)}</div>
-                <div class="info">Please try connecting again.</div>
-            </div>
-        </body>
-        </html>
-        """, status_code=500)
+    from fastapi.responses import HTMLResponse
+    
+    # Simple success page - will implement full OAuth later
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Noted - Connection Successful</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f8f9fa; }}
+            .container {{ max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+            .success {{ color: #28a745; font-size: 24px; margin-bottom: 20px; }}
+            .info {{ color: #666; font-size: 16px; margin-bottom: 15px; }}
+            .button {{ background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 20px; }}
+            .code-info {{ background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; font-family: monospace; word-break: break-all; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="success">✅ OAuth Authorization Received!</div>
+            <div class="info">Your Noted extension received the authorization from Notion.</div>
+            <div class="code-info">Auth Code: {code[:20] if len(code) > 20 else code}...</div>
+            <div class="info">You can now close this window and use the Noted extension.</div>
+            <div class="info"><small>Note: Full OAuth implementation coming soon!</small></div>
+            <a href="#" onclick="window.close()" class="button">Close Window</a>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return HTMLResponse(content=html_content)
 
 @app.get("/test/imports")
 def test_imports():
