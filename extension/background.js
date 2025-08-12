@@ -82,7 +82,6 @@ async function checkOAuthCompletion() {
             oauthState.lastCheck = Date.now();
         }
     } catch (error) {
-        console.error('Error checking OAuth completion:', error);
         oauthState.lastCheck = Date.now();
     }
 }
@@ -101,14 +100,12 @@ function startOAuthMonitoring() {
         }
     }, 2000); // Check every 2 seconds
 
-    console.log('OAuth monitoring started');
 }
 
 function stopOAuthMonitoring() {
     if (oauthCheckInterval) {
         clearInterval(oauthCheckInterval);
         oauthCheckInterval = null;
-        console.log('OAuth monitoring stopped');
     }
 }
 
@@ -125,7 +122,6 @@ function handleOAuthMessages(request, sender, sendResponse) {
 
 // Add the OAuth message handler to the existing listener
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log('Background received message:', request);
 
     if (request.action === 'getTabInfo') {
         // Get current tab information
@@ -169,7 +165,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         oauthState.completionData = null;
         oauthState.lastCheck = Date.now();
 
-        console.log('OAuth started, state:', oauthState);
         startOAuthMonitoring();
         sendResponse({ success: true });
         return true;
@@ -192,7 +187,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             completionData: null,
             lastCheck: null
         };
-        console.log('OAuth state cleared');
         stopOAuthMonitoring();
         sendResponse({ success: true });
         return true;

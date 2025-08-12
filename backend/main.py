@@ -153,7 +153,7 @@ async def notion_callback(code: str, state: Optional[str] = None):
             <div class="success">✅ Successfully Connected to Notion!</div>
             <div class="message">You can now close this window and return to the Noted extension.</div>
             <div class="message">Make sure to enter your OpenAI API key in the extension settings.</div>
-            <div class="user-id">User ID: {user_id}</div>
+            <div class="user-id">User ID: {user_id[:8]}...{user_id[-8:]}</div>
             <div id="user-id" style="display: none;">{user_id}</div>
             <button class="close-btn" onclick="window.close()">Close Window</button>
             <script>

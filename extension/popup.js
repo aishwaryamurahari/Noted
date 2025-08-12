@@ -12,13 +12,9 @@ class NotedPopup {
         await this.loadSettings();
         this.generateUserId();
 
-        console.log('=== INITIALIZING POPUP ===');
-        console.log('Initial user ID:', this.userId);
-
                 // Test backend connection first
         const backendConnected = await this.testBackendConnection();
         if (!backendConnected) {
-            console.log('Backend not accessible, showing disconnected state');
             const statusElement = document.getElementById('status');
             const refreshBtn = document.getElementById('refreshStatus');
             const errorElement = document.getElementById('error');
@@ -34,6 +30,9 @@ class NotedPopup {
             // Clear any cached connection state when backend is down
             await chrome.storage.local.remove(['notionConnected', 'lastConnectionCheck']);
 
+            // Clear OpenAI API key when backend is disconnected - user must re-authenticate everything
+            await this.clearStoredSettings();
+
             await this.updateUIState();
             return;
         }
@@ -47,20 +46,20 @@ class NotedPopup {
         const storedUserId = await this.getStoredUserId();
         if (storedUserId && storedUserId.length > 20) {
             // User has a stored Notion user ID, attempt to verify it's still valid
-            console.log('Found stored user ID, verifying connection:', storedUserId);
             this.userId = storedUserId;
 
             // Check if this user is still connected in the backend
             const isStillConnected = await this.verifyStoredConnection();
             if (isStillConnected) {
-                console.log('Stored connection is valid, restoring authenticated state');
                 await this.showConnectedState();
                 return; // Skip the rest of initialization since we're connected
             } else {
-                console.log('Stored connection is invalid, clearing and requiring re-auth');
                 await chrome.storage.sync.remove(['userId']);
                 this.userId = null;
                 this.generateUserId();
+
+                // Clear OpenAI API key when stored connection is invalid - user must re-authenticate everything
+                await this.clearStoredSettings();
             }
         }
 
@@ -71,14 +70,20 @@ class NotedPopup {
             // No background script or OAuth state to clear
         }
 
-        // Only check for OAuth completion if there's an active OAuth session
+        // Check for OAuth completion (both active and completed sessions)
         try {
             const oauthStatus = await chrome.runtime.sendMessage({ action: 'getOAuthStatus' });
-            if (oauthStatus && oauthStatus.isInProgress) {
-                await this.checkOAuthCompletion();
+            if (oauthStatus) {
+                if (oauthStatus.isInProgress) {
+                    // OAuth is still in progress, continue monitoring
+                    this.startOAuthCompletionPolling();
+                } else if (oauthStatus.completionData && oauthStatus.completionData.status === 'success') {
+                    // OAuth was completed while popup was closed, process it now
+                    await this.processCompletedOAuth(oauthStatus.completionData);
+                }
             }
         } catch (error) {
-            // No active OAuth session
+            // No background script or OAuth status available
         }
 
         // Check if user needs to authenticate (secure approach)
@@ -96,36 +101,29 @@ class NotedPopup {
                 // Final UI state update to ensure everything is properly configured
         await this.updateUIState();
 
-        console.log('=== INITIALIZATION COMPLETE ===');
     }
 
     async testBackendConnection() {
         try {
-            console.log('Testing backend connection...');
             const response = await fetch(`${this.backendUrl}/`);
             if (response.ok) {
-                console.log('Backend is accessible');
                 this.backendConnected = true;
                 return true;
             } else {
-                console.log('Backend returned error:', response.status);
                 this.backendConnected = false;
                 return false;
             }
         } catch (error) {
-            console.error('Backend connection failed:', error);
             this.backendConnected = false;
             return false;
         }
     }
 
     async checkAllConnections() {
-        console.log('=== CHECKING ALL CONNECTIONS ===');
 
                 // Test backend connection first
         const backendConnected = await this.testBackendConnection();
         if (!backendConnected) {
-            console.log('Backend not accessible, showing disconnected state');
             const statusElement = document.getElementById('status');
             const refreshBtn = document.getElementById('refreshStatus');
             const errorElement = document.getElementById('error');
@@ -140,6 +138,9 @@ class NotedPopup {
 
             // Clear any cached connection state when backend is down
             await chrome.storage.local.remove(['notionConnected', 'lastConnectionCheck']);
+
+            // Clear OpenAI API key when backend is disconnected - user must re-authenticate everything
+            await this.clearStoredSettings();
 
             await this.updateUIState();
             return;
@@ -160,7 +161,6 @@ class NotedPopup {
         // Add double-click handler for force reconnect when stuck in connected state
         connectNotionBtn.addEventListener('dblclick', async () => {
             if (connectNotionBtn.classList.contains('connected')) {
-                console.log('Force reconnect triggered via double-click');
                 this.showMessage('Force reconnecting...', 'info');
                 await this.forceDisconnectedState();
                 this.showMessage('Disconnected! You can now reconnect to Notion.', 'success');
@@ -192,42 +192,46 @@ class NotedPopup {
 
         // Debug: Add force reset on double-click of extension icon area
         document.querySelector('.header').addEventListener('dblclick', async () => {
-            console.log('🔄 Force reset triggered');
             await this.forceReset();
         });
 
 
     }
 
+    async processCompletedOAuth(completionData) {
+        try {
+            // Set the user ID from OAuth completion
+            await this.setNotionUserId(completionData.userId);
+
+            // Clear the OAuth state
+            await chrome.runtime.sendMessage({ action: 'clearOAuthState' });
+
+            // Show success message
+            this.showMessage('Successfully connected to Notion!', 'success');
+
+            // Refresh connection status
+            setTimeout(() => {
+                this.checkNotionConnection();
+            }, 1000);
+
+            return true;
+        } catch (error) {
+            console.error('Error processing completed OAuth:', error);
+            return false;
+        }
+    }
+
             async checkOAuthCompletion() {
         try {
             // Check if OAuth was completed in background
             const response = await chrome.runtime.sendMessage({ action: 'getOAuthStatus' });
-            console.log('OAuth status from background:', response);
 
             if (response.completionData && response.completionData.status === 'success') {
-                console.log('OAuth completed in background, setting user ID:', response.completionData.userId);
-
-                // Set the user ID from OAuth completion
-                await this.setNotionUserId(response.completionData.userId);
-
-                // Clear the OAuth state
-                await chrome.runtime.sendMessage({ action: 'clearOAuthState' });
-
-                // Show success message
-                this.showMessage('Successfully connected to Notion!', 'success');
-
-                // Refresh connection status
-                setTimeout(() => {
-                    this.checkNotionConnection();
-                }, 1000);
-
-                return true; // OAuth completed successfully
+                return await this.processCompletedOAuth(response.completionData);
             }
 
             return false; // OAuth not completed yet
         } catch (error) {
-            console.error('Error checking OAuth completion:', error);
             return false;
         }
     }
@@ -240,29 +244,25 @@ class NotedPopup {
 
         async detectRealUser() {
         try {
-            console.log('=== DETECTING REAL USER ===');
-            console.log('Current user ID:', this.userId);
-            console.log('User ID type:', typeof this.userId);
-            console.log('User ID length:', this.userId ? this.userId.length : 'null');
-
             // Always check for OAuth completion, regardless of current user ID
             // This handles cases where storage was cleared but OAuth completed
             const response = await fetch(`${this.backendUrl}/oauth/check-completion`);
             if (response.ok) {
                 const data = await response.json();
-                console.log('OAuth completion check result:', data);
 
                 if (data.has_users && data.latest_user_id) {
-                    // Verify this user is actually connected
-                    const statusResponse = await fetch(`${this.backendUrl}/user/${data.latest_user_id}/status`);
-                    if (statusResponse.ok) {
-                        const statusData = await statusResponse.json();
-                        console.log('Latest user status:', statusData);
+                    // Only proceed if this is a different user than we currently have
+                    // This prevents re-detecting the same existing session
+                    if (data.latest_user_id !== this.userId) {
+                        // Verify this user is actually connected
+                        const statusResponse = await fetch(`${this.backendUrl}/user/${data.latest_user_id}/status`);
+                        if (statusResponse.ok) {
+                            const statusData = await statusResponse.json();
 
-                        if (statusData.connected) {
-                            console.log('Found connected user, updating user ID from', this.userId, 'to', data.latest_user_id);
-                            await this.setNotionUserId(data.latest_user_id);
-                            return true;
+                            if (statusData.connected) {
+                                await this.setNotionUserId(data.latest_user_id);
+                                return true;
+                            }
                         }
                     }
                 }
@@ -277,28 +277,21 @@ class NotedPopup {
 
     async verifyUserToken(userId) {
         try {
-            console.log(`Verifying token for user: ${userId}`);
-
             const response = await fetch(`${this.backendUrl}/user/${userId}/status`);
             if (!response.ok) {
-                console.log(`User ${userId} verification failed - HTTP error`);
                 return false;
             }
 
             const data = await response.json();
-            console.log(`User ${userId} verification data:`, data);
 
             // Check if the token is valid and connected
             if (data.connected) {
-                console.log(`User ${userId} has valid token`);
                 return true;
             } else {
-                console.log(`User ${userId} has invalid token`);
                 return false;
             }
 
         } catch (error) {
-            console.error(`Error verifying user ${userId} token:`, error);
             return false;
         }
     }
@@ -306,7 +299,6 @@ class NotedPopup {
                 // Also check for any connected users when popup opens
     async checkForConnectedUsers() {
         // Method disabled for security - users must authenticate explicitly
-        console.log('=== CHECKING FOR CONNECTED USERS DISABLED FOR SECURITY ===');
         return;
     }
 
@@ -323,29 +315,24 @@ class NotedPopup {
 
     // Force refresh the UI based on current connection status
     async forceRefreshUI() {
-        console.log('=== FORCE REFRESHING UI ===');
-        console.log('Current user ID:', this.userId);
+
 
         if (!this.userId) {
-            console.log('No user ID available');
             return;
         }
 
         try {
             const response = await fetch(`${this.backendUrl}/user/${this.userId}/status`);
             const data = await response.json();
-            console.log('Connection data:', data);
 
             const statusElement = document.getElementById('status');
 
             if (data.connected) {
                 statusElement.className = 'status connected';
                 statusElement.textContent = `✅ Connected to Notion`;
-                console.log('UI updated to connected state');
             } else {
                 statusElement.className = 'status disconnected';
                 statusElement.textContent = '❌ Not connected to Notion';
-                console.log('UI updated to disconnected state');
             }
 
             // Update UI state after refreshing connection status
@@ -390,7 +377,6 @@ class NotedPopup {
             const result = await chrome.storage.sync.get(['userId']);
             if (result.userId) {
                 this.userId = result.userId;
-                console.log('Loaded stored User ID:', this.userId);
             } else {
                 // Generate a temporary user ID until OAuth completes
                 const canvas = document.createElement('canvas');
@@ -403,7 +389,6 @@ class NotedPopup {
                 const extensionId = chrome.runtime.id || 'noted';
 
                 this.userId = btoa(fingerprint + extensionId).substring(0, 16);
-                console.log('Generated temporary User ID:', this.userId);
             }
         } catch (error) {
             console.error('Error loading stored user ID:', error);
@@ -413,102 +398,25 @@ class NotedPopup {
     async setNotionUserId(notionUserId) {
         this.userId = notionUserId;
         await chrome.storage.sync.set({ userId: notionUserId });
-        console.log('Set Notion User ID:', notionUserId);
-    }
-
-    // Debug function to manually set the correct user ID
-    async setCorrectUserId() {
-        console.log('=== SETTING CORRECT USER ID ===');
-        // Use the user ID that we know has a token stored
-        const correctUserId = 'c425202e-f79f-40e2-98e4-aecacac9ec4e';
-        console.log('Setting user ID to:', correctUserId);
-
-        await this.setNotionUserId(correctUserId);
-        console.log('User ID set, now checking connection...');
-
-        await this.checkNotionConnection();
-        console.log('Connection check completed');
-
-        // Force UI update
-        const statusElement = document.getElementById('status');
-
-        // Check if the user is actually connected
-        try {
-            const response = await fetch(`${this.backendUrl}/user/${correctUserId}/status`);
-            const data = await response.json();
-            console.log('Final connection check:', data);
-
-            if (data.connected) {
-                statusElement.className = 'status connected';
-                statusElement.textContent = `✅ Connected to Notion`;
-                console.log('UI updated to connected state');
-            } else {
-                statusElement.className = 'status disconnected';
-                statusElement.textContent = '❌ Not connected to Notion';
-                console.log('UI updated to disconnected state');
-            }
-
-            // Update UI state after setting user ID
-            await this.updateUIState();
-        } catch (error) {
-            console.error('Error in final connection check:', error);
-        }
-
-        this.showMessage('Set correct user ID for testing', 'success');
-    }
-
-    // Debug function to test connection with correct user ID
-    async testCorrectUserId() {
-        console.log('=== TESTING CORRECT USER ID ===');
-        const correctUserId = 'c425202e-f79f-40e2-98e4-aecacac9ec4e';
-        console.log('Testing connection with correct user ID:', correctUserId);
-
-        try {
-            const response = await fetch(`${this.backendUrl}/user/${correctUserId}/status`);
-            console.log('Response status:', response.status);
-            const data = await response.json();
-            console.log('Test connection result:', data);
-
-            if (data.connected) {
-                this.showMessage('Backend shows user is connected!', 'success');
-
-                // Also update the UI immediately
-                const statusElement = document.getElementById('status');
-                statusElement.className = 'status connected';
-                statusElement.textContent = `✅ Connected to Notion`;
-                await this.updateUIState();
-            } else {
-                this.showMessage('Backend shows user is NOT connected', 'error');
-            }
-        } catch (error) {
-            console.error('Test connection error:', error);
-            this.showMessage('Test connection failed', 'error');
-        }
-    }
-
-    // Debug function to simulate OAuth completion
-    async simulateOAuthCompletion() {
-        console.log('Simulating OAuth completion...');
-
-        // Manually trigger the OAuth completion logic
-        this.showMessage('Successfully connected to Notion!', 'success');
-
-        console.log('Setting Notion user ID from simulation: c425202e-f79f-40e2-98e4-aecacac9ec4e');
-        await this.setNotionUserId('c425202e-f79f-40e2-98e4-aecacac9ec4e');
-
-        // Refresh connection status
-        setTimeout(() => {
-            this.checkNotionConnection();
-        }, 1000);
-
-        this.showMessage('Simulated OAuth completion', 'success');
     }
 
     async loadSettings() {
         try {
-            const result = await chrome.storage.sync.get(['openaiApiKey']);
-            if (result.openaiApiKey) {
-                document.getElementById('openaiKey').value = result.openaiApiKey;
+            const result = await chrome.storage.sync.get(['openaiApiKey', 'openaiKeyValid']);
+            const openaiKeyInput = document.getElementById('openaiKey');
+
+            if (result.openaiApiKey && result.openaiKeyValid) {
+                // Show masked version of saved key
+                const maskedKey = this.maskApiKey(result.openaiApiKey);
+                openaiKeyInput.value = maskedKey;
+                openaiKeyInput.setAttribute('data-saved-key', result.openaiApiKey);
+                openaiKeyInput.setAttribute('data-is-masked', 'true');
+
+                // Add focus handler to allow editing
+                this.setupApiKeyEditHandlers(openaiKeyInput);
+            } else if (result.openaiApiKey) {
+                // Key exists but not validated, show full key for re-validation
+                openaiKeyInput.value = result.openaiApiKey;
             }
 
             // Update Save Settings button visibility after loading
@@ -518,9 +426,55 @@ class NotedPopup {
         }
     }
 
-    async saveSettings() {
+    maskApiKey(key) {
+        if (!key || key.length < 8) return key;
+        // Show first 7 characters and last 4 characters, mask the middle
+        const start = key.substring(0, 7);
+        const end = key.substring(key.length - 4);
+        const middle = '•'.repeat(Math.min(32, key.length - 11));
+        return start + middle + end;
+    }
+
+    setupApiKeyEditHandlers(input) {
+        const handleFocus = () => {
+            if (input.getAttribute('data-is-masked') === 'true') {
+                input.value = '';
+                input.placeholder = 'Enter new OpenAI API key or paste existing key';
+                input.removeAttribute('data-is-masked');
+            }
+        };
+
+        const handleBlur = () => {
+            const currentValue = input.value.trim();
+            const savedKey = input.getAttribute('data-saved-key');
+
+            if (!currentValue && savedKey) {
+                // User cleared input, show masked version again
+                input.value = this.maskApiKey(savedKey);
+                input.setAttribute('data-is-masked', 'true');
+                input.placeholder = 'Enter your OpenAI API key';
+            }
+        };
+
+        // Remove existing listeners to avoid duplicates
+        input.removeEventListener('focus', handleFocus);
+        input.removeEventListener('blur', handleBlur);
+
+        // Add new listeners
+        input.addEventListener('focus', handleFocus);
+        input.addEventListener('blur', handleBlur);
+    }
+
+        async saveSettings() {
         try {
-            const openaiKey = document.getElementById('openaiKey').value.trim();
+            const openaiKeyInput = document.getElementById('openaiKey');
+            let openaiKey = openaiKeyInput.value.trim();
+
+            // Check if input is showing masked key
+            if (openaiKeyInput.getAttribute('data-is-masked') === 'true') {
+                this.showMessage('Please enter a new API key or clear the field to edit the existing one', 'error');
+                return;
+            }
 
             if (!openaiKey) {
                 this.showMessage('Please enter an OpenAI API key', 'error');
@@ -543,10 +497,19 @@ class NotedPopup {
                 openaiApiKey: openaiKey,
                 openaiKeyValid: true
             });
+
+            // Update the input to show masked version of new key
+            const maskedKey = this.maskApiKey(openaiKey);
+            openaiKeyInput.value = maskedKey;
+            openaiKeyInput.setAttribute('data-saved-key', openaiKey);
+            openaiKeyInput.setAttribute('data-is-masked', 'true');
+            this.setupApiKeyEditHandlers(openaiKeyInput);
+
             this.showMessage('Settings saved successfully! OpenAI API key validated.', 'success');
 
             // Update UI state after saving settings
             await this.updateUIState();
+            await this.updateSaveSettingsVisibility();
         } catch (error) {
             console.error('Error saving settings:', error);
             this.showMessage('Failed to save settings: ' + error.message, 'error');
@@ -555,8 +518,6 @@ class NotedPopup {
 
     async validateOpenAIKey(apiKey) {
         try {
-            console.log('Validating OpenAI API key...');
-
             // Make a simple request to OpenAI API to validate the key
             const response = await fetch('https://api.openai.com/v1/models', {
                 method: 'GET',
@@ -567,10 +528,8 @@ class NotedPopup {
             });
 
             if (response.ok) {
-                console.log('OpenAI API key is valid');
                 return true;
             } else {
-                console.log('OpenAI API key validation failed:', response.status);
                 return false;
             }
         } catch (error) {
@@ -581,44 +540,35 @@ class NotedPopup {
 
     async checkNotionConnection() {
         try {
-            console.log('=== CHECKING NOTION CONNECTION ===');
-            console.log('Checking Notion connection for user ID:', this.userId);
-            console.log('Current user ID type:', typeof this.userId);
-            console.log('Current user ID length:', this.userId ? this.userId.length : 'null');
 
             if (!this.userId) {
-                console.log('No user ID available, showing disconnected state');
                 await this.showDisconnectedState('No user ID available');
                 return;
             }
 
             // Check connection status with enhanced backend validation
             const response = await fetch(`${this.backendUrl}/user/${this.userId}/status`);
-            console.log('Response status:', response.status);
 
             if (!response.ok) {
-                console.log('Status check failed, forcing disconnected state');
                 await this.forceDisconnectedState();
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            console.log('Connection status data:', data);
 
             if (data.connected !== true) {
-                console.log('User is not connected to Notion:', data.reason);
-
                 // If backend says user is not connected, clear stored authentication
                 if (data.reason === 'invalid_token' || data.reason === 'no_token') {
-                    console.log('Token is invalid or missing, clearing stored authentication');
                     await chrome.storage.sync.remove(['userId']);
                     this.userId = null;
                     this.generateUserId();
+
+                    // Clear OpenAI API key when tokens are invalid - user must re-authenticate everything
+                    await this.clearStoredSettings();
                 }
 
                 // Handle different disconnection reasons
                 if (data.action === 'clear_extension_storage') {
-                    console.log('Backend requests clearing extension storage');
                     await this.clearExtensionStorage();
                 }
 
@@ -627,7 +577,6 @@ class NotedPopup {
             }
 
             // User is connected and token is valid
-            console.log('User is connected to Notion:', data.workspace_name || data.workspace_id);
             await this.showConnectedState(data.workspace_name);
 
         } catch (error) {
@@ -638,26 +587,19 @@ class NotedPopup {
 
     async verifyNotionToken() {
         try {
-            console.log('=== VERIFYING NOTION TOKEN ===');
-
             // Test the token by checking user status
             const response = await fetch(`${this.backendUrl}/user/${this.userId}/status`);
-            console.log('Token verification response status:', response.status);
 
             if (!response.ok) {
-                console.log('Token verification failed - HTTP error');
                 return false;
             }
 
             const data = await response.json();
-            console.log('Token verification data:', data);
 
             // Check if the token is valid and connected
             if (data.connected) {
-                console.log('Token is valid and can access Notion workspace');
                 return true;
             } else {
-                console.log('Token is invalid or cannot access Notion');
                 return false;
             }
 
@@ -667,7 +609,7 @@ class NotedPopup {
         }
     }
 
-                async showConnectedState(workspaceName = null) {
+        async showConnectedState(workspaceName = null) {
         const statusElement = document.getElementById('status');
         const refreshBtn = document.getElementById('refreshStatus');
         const errorElement = document.getElementById('error');
@@ -716,8 +658,6 @@ class NotedPopup {
     }
 
     async forceDisconnectedState() {
-        console.log('=== FORCING DISCONNECTED STATE ===');
-
         // Clear any stored user ID that might be stale
         await chrome.storage.sync.remove(['userId']);
         this.userId = null;
@@ -744,7 +684,6 @@ class NotedPopup {
         // Update UI state
         await this.updateUIState();
 
-        console.log('Forced disconnected state complete, new user ID:', this.userId);
     }
 
     async clearStoredSettings() {
@@ -758,7 +697,6 @@ class NotedPopup {
                 openaiKeyInput.value = '';
             }
 
-            console.log('Cleared stored OpenAI API key and validation status - user disconnected from Notion');
         } catch (error) {
             console.error('Error clearing stored settings:', error);
         }
@@ -779,7 +717,6 @@ class NotedPopup {
                 openaiKeyInput.value = '';
             }
 
-            console.log('Cleared all extension storage - state mismatch resolved');
         } catch (error) {
             console.error('Error clearing extension storage:', error);
         }
@@ -794,7 +731,6 @@ class NotedPopup {
 
         // Check connection when popup gains focus (user returns from OAuth)
         window.addEventListener('focus', async () => {
-            console.log('Popup gained focus - checking OAuth status');
             // Only check OAuth completion if there's an active session
             try {
                 const oauthStatus = await chrome.runtime.sendMessage({ action: 'getOAuthStatus' });
@@ -809,7 +745,6 @@ class NotedPopup {
         // Check connection when popup becomes visible again
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden) {
-                console.log('Popup became visible - checking OAuth status');
                 // Only check OAuth completion if there's an active session
                 try {
                     const oauthStatus = await chrome.runtime.sendMessage({ action: 'getOAuthStatus' });
@@ -834,6 +769,11 @@ class NotedPopup {
         try {
             const connectNotionBtn = document.getElementById('connectNotion');
 
+            // Clear any existing stored user ID to force fresh authentication
+            await chrome.storage.sync.remove(['userId']);
+            this.userId = null;
+            this.generateUserId();
+
             // Update button to show connecting state
             connectNotionBtn.textContent = 'Connecting...';
             connectNotionBtn.disabled = true;
@@ -844,35 +784,31 @@ class NotedPopup {
 
                 const authUrl = `${this.backendUrl}/auth/notion/login`;
 
-            // Open Notion authorization in a popup window
+
             const popup = window.open(
                 authUrl,
                 'notion_auth',
-                'width=500,height=600,scrollbars=yes,resizable=yes'
+                'width=500,height=600,scrollbars=yes,resizable=yes,noopener=yes'
             );
 
-            console.log('Popup window created:', popup);
-
-            if (!popup) {
-                // Reset button on error
-                connectNotionBtn.textContent = 'Connect to Notion';
-                connectNotionBtn.disabled = false;
-                connectNotionBtn.classList.remove('connecting', 'connected');
-                throw new Error('Popup blocked. Please allow popups for this extension.');
-            }
+            const keepAlive = setInterval(() => {
+                if (popup && popup.closed) {
+                    clearInterval(keepAlive);
+                } else if (popup) {
+                    // Periodically check if popup still exists
+                    try {
+                        popup.location; // This will throw if popup is closed
+                    } catch (e) {
+                        clearInterval(keepAlive);
+                    }
+                }
+            }, 1000);
 
             // Show connecting message
-            this.showMessage('Connecting to Notion... Please complete the authorization in the popup window.', 'success');
+            this.showMessage('Connecting to Notion... Complete authorization in the popup window. This extension popup will stay open to show connection status.', 'success');
 
-                            // Listen for popup close with immediate checking
-                const checkClosed = setInterval(() => {
-                    if (popup.closed) {
-                        clearInterval(checkClosed);
-
-                        // Start immediate checking for OAuth completion
-                        this.startOAuthCompletionPolling();
-                    }
-                }, 500); // Check more frequently
+            // Start OAuth monitoring immediately
+            this.startOAuthCompletionPolling();
 
         } catch (error) {
             console.error('Error connecting to Notion:', error);
@@ -887,7 +823,6 @@ class NotedPopup {
     }
 
     async forceReset() {
-        console.log('🔄 Force resetting extension state...');
 
         try {
             // Clear all Chrome storage
@@ -926,10 +861,7 @@ class NotedPopup {
             await this.updateUIState();
 
             this.showMessage('🔄 Extension reset! Please authenticate again.', 'info');
-            console.log('✅ Force reset complete');
-
         } catch (error) {
-            console.error('Error during force reset:', error);
             this.showMessage('Reset failed. Try reloading the extension.', 'error');
         }
     }
@@ -939,18 +871,14 @@ class NotedPopup {
         let attempts = 0;
         const maxAttempts = 15; // 15 attempts over 30 seconds
 
-        console.log('Starting OAuth completion polling...');
-
         const pollInterval = setInterval(async () => {
             attempts++;
-            console.log(`OAuth polling attempt ${attempts}/${maxAttempts}`);
 
             try {
-                // First, check if any user was successfully connected to backend
-                const detectedUser = await this.detectRealUser();
+                // Check for OAuth completion via background script first
+                const oauthCompleted = await this.checkOAuthCompletion();
 
-                if (detectedUser) {
-                    console.log('✅ OAuth completed successfully! User ID updated to:', this.userId);
+                if (oauthCompleted) {
                     clearInterval(pollInterval);
 
                     // Update button immediately
@@ -965,8 +893,24 @@ class NotedPopup {
                     return;
                 }
 
-                // Fallback: Check for OAuth completion via background script
-                const oauthCompleted = await this.checkOAuthCompletion();
+                // Check if any user was successfully connected to backend during this session
+                // Only check for new connections, not existing ones
+                const detectedUser = await this.detectRealUser();
+
+                if (detectedUser) {
+                    clearInterval(pollInterval);
+
+                    // Update button immediately
+                    connectNotionBtn.textContent = '✅ Connected to Notion';
+                    connectNotionBtn.disabled = true;
+                    connectNotionBtn.classList.remove('connecting');
+                    connectNotionBtn.classList.add('connected');
+
+                    // Update internal state and UI
+                    await this.checkNotionConnection();
+
+                    return;
+                }
 
                 // Additional fallback: Check current user ID status
                 if (this.userId) {
@@ -974,7 +918,6 @@ class NotedPopup {
                     if (response.ok) {
                         const data = await response.json();
                         if (data.connected) {
-                            console.log('✅ OAuth completed successfully via current user ID!');
                             clearInterval(pollInterval);
 
                             // Update button immediately
@@ -993,7 +936,6 @@ class NotedPopup {
 
                 // If max attempts reached, reset button
                 if (attempts >= maxAttempts) {
-                    console.log('OAuth polling timeout - resetting button');
                     clearInterval(pollInterval);
                     connectNotionBtn.textContent = 'Connect to Notion';
                     connectNotionBtn.disabled = false;
@@ -1063,7 +1005,6 @@ class NotedPopup {
             );
 
         } catch (error) {
-            console.error('Error summarizing page:', error);
             this.showMessage(error.message, 'error');
             this.hideCategoryConfirmation(); // Hide category UI if there's an error
         } finally {
@@ -1310,7 +1251,6 @@ class NotedPopup {
             }
 
             const data = await response.json();
-            console.log('Saved to Notion:', data.page_url);
             return data.page_url; // Return the page URL
 
         } catch (error) {
@@ -1320,9 +1260,6 @@ class NotedPopup {
 
     async saveToNotionWithCategory(summary, url, title, category) {
         try {
-            console.log('=== SAVING TO NOTION ===');
-            console.log('User ID:', this.userId);
-            console.log('Category:', category);
 
             if (!this.userId) {
                 throw new Error('No user ID available. Please reconnect to Notion.');
@@ -1333,19 +1270,15 @@ class NotedPopup {
             if (statusResponse.ok) {
                 const statusData = await statusResponse.json();
                 if (!statusData.connected) {
-                    console.log('User not connected, attempting to detect real user...');
                     const detectedUser = await this.detectRealUser();
                     if (!detectedUser) {
                         // Force UI to disconnected state and clear any stale data
-                        console.log('No real user found, forcing disconnected state');
                         await this.forceDisconnectedState();
                         throw new Error('User not authenticated with Notion. Please reconnect.');
                     }
-                    console.log('Real user detected, updated user ID to:', this.userId);
                 }
             } else {
                 // Status check failed, force disconnected state
-                console.log('Status check failed, forcing disconnected state');
                 await this.forceDisconnectedState();
                 throw new Error('Unable to verify Notion connection. Please reconnect.');
             }
@@ -1364,12 +1297,9 @@ class NotedPopup {
                 })
             });
 
-            console.log('Save response status:', response.status);
 
             if (!response.ok) {
                 const errorData = await response.json();
-                console.error('Save error data:', errorData);
-
                 // Handle specific error cases
                 if (response.status === 401) {
                     throw new Error('Authentication failed. Please reconnect to Notion.');
@@ -1381,7 +1311,6 @@ class NotedPopup {
             }
 
             const data = await response.json();
-            console.log('Successfully saved to Notion with category:', category, data.page_url);
             return data.page_url;
 
         } catch (error) {
@@ -1391,7 +1320,6 @@ class NotedPopup {
     }
 
     testPopupWindow() {
-        console.log('Testing popup window functionality');
         const testPopup = window.open(
             'https://www.google.com',
             'test_popup',
@@ -1399,23 +1327,17 @@ class NotedPopup {
         );
 
         if (testPopup) {
-            console.log('Test popup created successfully');
             this.showMessage('Test popup created successfully!', 'success');
         } else {
-            console.log('Test popup blocked');
             this.showMessage('Popup blocked. Please allow popups for this extension.', 'error');
         }
     }
 
     async debugConnection() {
-        console.log('=== DEBUG CONNECTION ===');
-        console.log('User ID:', this.userId);
-        console.log('Backend URL:', this.backendUrl);
 
         try {
             const response = await fetch(`${this.backendUrl}/user/${this.userId}/status`);
             const data = await response.json();
-            console.log('Connection status:', data);
             this.showMessage(`Status: ${JSON.stringify(data, null, 2)}`, 'success');
         } catch (error) {
             console.error('Status check error:', error);
@@ -1537,21 +1459,40 @@ class NotedPopup {
             const result = await chrome.storage.sync.get(['openaiApiKey', 'openaiKeyValid']);
             const savedOpenaiKey = result.openaiApiKey;
             const isOpenaiKeyValid = result.openaiKeyValid === true;
-            const isConnectedToNotion = statusElement.className.includes('connected');
+            const currentInputValue = openaiKeyInput.value.trim();
+            const isInputMasked = openaiKeyInput.getAttribute('data-is-masked') === 'true';
 
-            // Hide Save Settings button only if Notion is connected AND OpenAI key is SAVED AND VALIDATED
-            if (savedOpenaiKey && savedOpenaiKey.trim() && isOpenaiKeyValid && isConnectedToNotion) {
-                saveSettingsBtn.style.display = 'none';
-                console.log('Save Settings button hidden - fully configured and validated');
-            } else {
-                saveSettingsBtn.style.display = 'block';
-                if (!savedOpenaiKey || !savedOpenaiKey.trim()) {
-                    console.log('Save Settings button shown - OpenAI key not provided');
-                } else if (!isOpenaiKeyValid) {
-                    console.log('Save Settings button shown - OpenAI key not validated');
-                } else if (!isConnectedToNotion) {
-                    console.log('Save Settings button shown - Notion not connected');
+            // Always show the Save Settings button - users should always be able to update their API key
+            saveSettingsBtn.style.display = 'block';
+
+            // Update button text and style based on current state
+            if (savedOpenaiKey && savedOpenaiKey.trim() && isOpenaiKeyValid) {
+                if (isInputMasked) {
+                    // Showing masked saved key
+                    saveSettingsBtn.textContent = 'API Key Saved ✓';
+                    saveSettingsBtn.style.backgroundColor = '#10b981'; // Green color for saved
+                    saveSettingsBtn.disabled = true; // Disable until user starts editing
+                } else if (currentInputValue && currentInputValue !== savedOpenaiKey) {
+                    // User has typed a different key
+                    saveSettingsBtn.textContent = 'Update API Key';
+                    saveSettingsBtn.style.backgroundColor = '#f59e0b'; // Amber color for update
+                    saveSettingsBtn.disabled = false;
+                } else if (!currentInputValue) {
+                    // User cleared the input
+                    saveSettingsBtn.textContent = 'Enter New API Key';
+                    saveSettingsBtn.style.backgroundColor = '#6366f1'; // Default blue
+                    saveSettingsBtn.disabled = true;
+                } else {
+                    // Same key as saved
+                    saveSettingsBtn.textContent = 'API Key Unchanged';
+                    saveSettingsBtn.style.backgroundColor = '#6b7280'; // Gray color
+                    saveSettingsBtn.disabled = true;
                 }
+            } else {
+                // No valid key saved yet
+                saveSettingsBtn.textContent = 'Save Settings';
+                saveSettingsBtn.style.backgroundColor = '#6366f1'; // Default blue
+                saveSettingsBtn.disabled = !currentInputValue;
             }
         }
     }
@@ -1577,7 +1518,6 @@ class NotedPopup {
         // Enable summarize button only if ALL conditions are met
         if (this.backendConnected && isConnectedToNotion && hasValidOpenaiKey) {
             summarizeBtn.disabled = false;
-            console.log('Summarize button enabled - backend, Notion, and valid OpenAI key all configured');
         } else {
             summarizeBtn.disabled = true;
             if (!this.backendConnected) {
@@ -1601,14 +1541,12 @@ class NotedPopup {
             connectNotionBtn.textContent = '✅ Connected to Notion';
             connectNotionBtn.classList.remove('connecting');
             connectNotionBtn.classList.add('connected');
-            console.log('Connect to Notion button disabled - already connected');
         } else {
             // Only reset if not currently in connecting state
             if (!connectNotionBtn.classList.contains('connecting')) {
                 connectNotionBtn.disabled = false;
                 connectNotionBtn.textContent = 'Connect to Notion';
                 connectNotionBtn.classList.remove('connected', 'connecting');
-                console.log('Connect to Notion button enabled - not connected');
             }
         }
 
