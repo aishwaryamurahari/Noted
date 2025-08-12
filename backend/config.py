@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-this")
 
     # Database Configuration
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./tokens.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:////tmp/tokens.db")
 
     class Config:
         env_file = ".env"
