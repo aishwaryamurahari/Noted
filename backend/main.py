@@ -19,10 +19,15 @@ from config import settings
 
 app = FastAPI(title="Noted Backend", version="1.0.0")
 
-# Add CORS middleware for Chrome extension
+# Add CORS middleware for Chrome extension and development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["chrome-extension://*"],
+    allow_origins=[
+        "chrome-extension://*",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "https://*.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
