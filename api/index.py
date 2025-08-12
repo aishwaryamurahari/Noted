@@ -120,11 +120,9 @@ async def notion_callback(code: str, state: Optional[str] = None):
         </body>
         </html>
         """)
-
         
-    except HTTPException:
-        raise
     except Exception as e:
+        from fastapi.responses import HTMLResponse
         return HTMLResponse(f"""
         <!DOCTYPE html>
         <html>
