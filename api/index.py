@@ -86,6 +86,93 @@ async def notion_login():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating auth URL: {str(e)}")
 
+@app.get("/auth/notion/callback")
+async def notion_callback(code: str, state: Optional[str] = None):
+    """Handle Notion OAuth callback"""
+    try:
+        from notion_oauth import NotionOAuth
+        from notion_api import NotionAPI
+        from storage import TokenStorage
+        from fastapi.responses import HTMLResponse
+        from typing import Optional
+        
+        notion_oauth = NotionOAuth()
+        notion_api = NotionAPI()
+        token_storage = TokenStorage()
+        
+        # Exchange code for access token
+        token_response = notion_oauth.exchange_code_for_token(code)
+        
+        if not token_response or 'access_token' not in token_response:
+            raise HTTPException(status_code=400, detail="Failed to get access token")
+        
+        access_token = token_response['access_token']
+        
+        # Get user info from Notion
+        user_info = notion_api.get_user_info(access_token)
+        user_id = user_info.get('id') if user_info else None
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="Failed to get user info")
+        
+        # Store the token
+        success = token_storage.store_token(user_id, access_token, token_response)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to store token")
+        
+        # Return success page
+        return HTMLResponse(f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Noted - Connection Successful</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f8f9fa; }}
+                .container {{ max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                .success {{ color: #28a745; font-size: 24px; margin-bottom: 20px; }}
+                .info {{ color: #666; font-size: 16px; margin-bottom: 15px; }}
+                .button {{ background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 20px; }}
+                .user-info {{ background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; font-family: monospace; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="success">✅ Successfully connected to Notion!</div>
+                <div class="info">Your Noted extension is now connected to your Notion workspace.</div>
+                <div class="user-info">User ID: {user_id}</div>
+                <div class="info">You can now close this window and use the Noted extension to summarize articles.</div>
+                <a href="#" onclick="window.close()" class="button">Close Window</a>
+            </div>
+        </body>
+        </html>
+        """)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        return HTMLResponse(f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Noted - Connection Error</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f8f9fa; }}
+                .container {{ max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                .error {{ color: #dc3545; font-size: 24px; margin-bottom: 20px; }}
+                .info {{ color: #666; font-size: 16px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="error">❌ Connection Failed</div>
+                <div class="info">Error: {str(e)}</div>
+                <div class="info">Please try connecting again.</div>
+            </div>
+        </body>
+        </html>
+        """, status_code=500)
+
 @app.get("/test/imports")
 def test_imports():
     """Test individual imports to identify issues"""
