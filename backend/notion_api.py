@@ -226,7 +226,7 @@ class NotionAPI:
                         {
                             "type": "text",
                             "text": {
-                                "content": f"{emoji} {title}"
+                                "content": title
                             }
                         }
                     ]
@@ -671,7 +671,7 @@ class NotionAPI:
                         {
                             "type": "text",
                             "text": {
-                                "content": f"{emoji} {category}"
+                                "content": f"📂 {category}"
                             }
                         }
                     ]
