@@ -2,6 +2,12 @@
 
 A full-stack Chrome Extension that lets users summarize web articles and save them to their own Notion workspace using OpenAI GPT-3.5.
 
+## 🎬 Demo
+
+![Noted Extension Demo](demo/noted-demo.gif)
+
+*Transform any webpage into organized summaries in your Notion workspace with just one click!*
+
 ## Features
 
 - **Chrome Extension**: Extract article content from any webpage
