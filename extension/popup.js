@@ -153,6 +153,9 @@ class NotedPopup {
             // If no new user detected, check current user connection
             await this.checkNotionConnection();
         }
+
+        // Check if there's a recent successful OAuth we missed
+        await this.checkForMissedOAuth();
     }
 
     bindEvents() {
@@ -242,8 +245,46 @@ class NotedPopup {
 
             // Auto-detect connected users on popup open
     async autoDetectConnection() {
-        // Auto-detect is now disabled for security - users must authenticate explicitly
+                    // Auto-detect is now disabled for security - users must authenticate explicitly
         return false;
+    }
+
+    async checkForMissedOAuth() {
+        // Check if there's a recent OAuth completion that we missed due to timing issues
+        try {
+            // Check if there's a recent successful OAuth stored locally
+            const stored = await chrome.storage.local.get(['lastConnectedUser', 'lastConnectionTime']);
+
+            if (stored.lastConnectedUser && stored.lastConnectionTime) {
+                const timeSinceConnection = Date.now() - stored.lastConnectionTime;
+                // If the connection was within the last 30 seconds, check it
+                if (timeSinceConnection < 30000) {
+                    console.log('Checking missed OAuth completion for user:', stored.lastConnectedUser);
+
+                    // Check if this user is actually connected
+                    try {
+                        const response = await fetch(`${this.backendUrl}/user/${stored.lastConnectedUser}/status`);
+                        const data = await response.json();
+
+                        if (data.connected) {
+                            console.log('✅ Found missed OAuth completion!');
+                            this.userId = stored.lastConnectedUser;
+                            await chrome.storage.sync.set({ userId: this.userId });
+                            await this.updateUIState();
+                            this.showMessage('✅ Successfully connected to Notion!', 'success');
+                            return true;
+                        }
+                    } catch (error) {
+                        console.error('Error checking missed OAuth:', error);
+                    }
+                }
+            }
+
+            return false;
+        } catch (error) {
+            console.error('Error in checkForMissedOAuth:', error);
+            return false;
+        }
     }
 
         async detectRealUser() {
@@ -793,6 +834,7 @@ class NotedPopup {
 
             // Clear any existing stored user ID to force fresh authentication
             await chrome.storage.sync.remove(['userId']);
+            await chrome.storage.local.remove(['lastConnectedUser', 'lastConnectionTime']);
             this.userId = null;
             this.generateUserId();
 
@@ -801,8 +843,14 @@ class NotedPopup {
             connectNotionBtn.disabled = true;
             connectNotionBtn.classList.add('connecting');
 
-                            // Notify background script that OAuth is starting
+            // Clear any previous OAuth state in background script
+            await chrome.runtime.sendMessage({ action: 'clearOAuthState' });
+
+            // Wait a moment, then start new OAuth
+            setTimeout(async () => {
+                // Notify background script that OAuth is starting
                 await chrome.runtime.sendMessage({ action: 'startOAuth' });
+            }, 100);
 
                 const authUrl = `${this.backendUrl}/auth/notion/login`;
 

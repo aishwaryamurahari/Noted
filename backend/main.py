@@ -87,15 +87,28 @@ async def check_oauth_completion():
     """Check if there are any completed OAuth users - secure version"""
     users = get_token_storage().list_users()
     if users:
-        # Return only the most recent user ID (likely the one who just completed OAuth)
-        latest_user = max(users, key=lambda x: x['created_at'])
+        # Sort by created_at (handle both datetime and ISO string formats)
+        def get_creation_time(user):
+            created_at = user['created_at']
+            if isinstance(created_at, str):
+                # Parse ISO string to datetime for comparison
+                from datetime import datetime
+                return datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            return created_at
+
+        # Return the most recent user ID (likely the one who just completed OAuth)
+        latest_user = max(users, key=get_creation_time)
         return {
             "has_users": True,
-            "latest_user_id": latest_user['user_id']
+            "latest_user_id": latest_user['user_id'],
+            "total_users": len(users),
+            "storage_type": "in_memory" if os.getenv('VERCEL') else "sqlite"
         }
     return {
         "has_users": False,
-        "latest_user_id": None
+        "latest_user_id": None,
+        "total_users": 0,
+        "storage_type": "in_memory" if os.getenv('VERCEL') else "sqlite"
     }
 
 @app.get("/")

@@ -182,7 +182,7 @@ class InMemoryTokenStorage:
             {
                 "user_id": user_id,
                 "workspace_id": data["workspace_id"],
-                "created_at": data["created_at"]
+                "created_at": data["created_at"]  # Keep as ISO string for consistency
             }
             for user_id, data in self._storage.items()
         ]

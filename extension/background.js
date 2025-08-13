@@ -45,20 +45,33 @@ async function checkOAuthCompletion() {
         const response = await fetch(`https://noted-six.vercel.app/oauth/check-completion`);
         const completionData = await response.json();
 
-                        let connectedUserId = null;
-                if (completionData.has_users && completionData.latest_user_id) {
-                    // Check if this user is connected
-                    try {
-                        const userResponse = await fetch(`https://noted-six.vercel.app/user/${completionData.latest_user_id}/status`);
-                        const userData = await userResponse.json();
+        console.log('OAuth completion check:', completionData);
 
-                        if (userData.connected) {
-                            connectedUserId = completionData.latest_user_id;
-                        }
-                    } catch (error) {
-                        console.error(`Error checking user ${completionData.latest_user_id}:`, error);
-                    }
+        let connectedUserId = null;
+        if (completionData.has_users && completionData.latest_user_id) {
+            // Check if this user is connected
+            try {
+                const userResponse = await fetch(`https://noted-six.vercel.app/user/${completionData.latest_user_id}/status`);
+                const userData = await userResponse.json();
+
+                console.log(`User ${completionData.latest_user_id} status:`, userData);
+
+                if (userData.connected) {
+                    connectedUserId = completionData.latest_user_id;
+                    console.log('✅ OAuth completion detected for user:', connectedUserId);
+
+                    // Store the successful user ID to prevent re-processing
+                    await chrome.storage.local.set({
+                        'lastConnectedUser': connectedUserId,
+                        'lastConnectionTime': Date.now()
+                    });
                 }
+            } catch (error) {
+                console.error(`Error checking user ${completionData.latest_user_id}:`, error);
+            }
+        } else {
+            console.log('No users found or latest_user_id missing');
+        }
 
         if (connectedUserId) {
             // OAuth completed successfully
@@ -70,6 +83,8 @@ async function checkOAuthCompletion() {
             };
             oauthState.lastCheck = Date.now();
 
+            console.log('🎉 OAuth completed successfully!');
+
             // Show notification
             chrome.notifications.create({
                 type: 'basic',
@@ -80,8 +95,10 @@ async function checkOAuthCompletion() {
         } else {
             // Still not connected, update last check time
             oauthState.lastCheck = Date.now();
+            console.log('OAuth still in progress...');
         }
     } catch (error) {
+        console.error('Error checking OAuth completion:', error);
         oauthState.lastCheck = Date.now();
     }
 }
@@ -160,11 +177,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'startOAuth') {
-        // Start OAuth process
-        oauthState.isInProgress = true;
-        oauthState.completionData = null;
-        oauthState.lastCheck = Date.now();
+        // Clear any previous OAuth state
+        oauthState = {
+            isInProgress: true,
+            completionData: null,
+            lastCheck: Date.now()
+        };
 
+        console.log('🚀 Starting OAuth monitoring...');
         startOAuthMonitoring();
         sendResponse({ success: true });
         return true;
