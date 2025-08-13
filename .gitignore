@@ -6,3 +6,5 @@ __pycache__/
 ENVIRONMENT_SETUP.md
 env.example
 noted-extension-*.zip
+.DS_Store
+extension/.DS_Store

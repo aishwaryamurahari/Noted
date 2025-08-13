@@ -5,6 +5,7 @@ import uvicorn
 from typing import Optional
 import requests
 import json
+import os
 from datetime import datetime
 
 from models import (
@@ -13,7 +14,7 @@ from models import (
 )
 from notion_oauth import NotionOAuth
 from notion_api import NotionAPI
-from storage import TokenStorage
+from storage import TokenStorage, InMemoryTokenStorage
 from openai_summarizer import OpenAISummarizer
 from config import settings
 
@@ -33,11 +34,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize components
-token_storage = TokenStorage()
-notion_oauth = NotionOAuth()
-notion_api = NotionAPI()
-openai_summarizer = OpenAISummarizer()
+# Initialize components (lazy loading for serverless)
+_token_storage = None
+_notion_oauth = None
+_notion_api = None
+_openai_summarizer = None
+
+def get_token_storage():
+    global _token_storage
+    if _token_storage is None:
+        if os.getenv('VERCEL'):
+            _token_storage = InMemoryTokenStorage()
+        else:
+            _token_storage = TokenStorage()
+    return _token_storage
+
+def get_notion_oauth():
+    global _notion_oauth
+    if _notion_oauth is None:
+        _notion_oauth = NotionOAuth()
+    return _notion_oauth
+
+def get_notion_api():
+    global _notion_api
+    if _notion_api is None:
+        _notion_api = NotionAPI()
+    return _notion_api
+
+def get_openai_summarizer():
+    global _openai_summarizer
+    if _openai_summarizer is None:
+        _openai_summarizer = OpenAISummarizer()
+    return _openai_summarizer
 
 # REMOVE OR SECURE DEBUG ENDPOINTS - SECURITY CRITICAL
 # @app.get("/debug/user/{user_id}")
@@ -50,14 +78,14 @@ async def admin_health():
     """Secure health check - no sensitive data"""
     return {
         "status": "healthy",
-        "total_users": len(token_storage.list_users()),
+        "total_users": len(get_token_storage().list_users()),
         "timestamp": datetime.now().isoformat()
     }
 
 @app.get("/oauth/check-completion")
 async def check_oauth_completion():
     """Check if there are any completed OAuth users - secure version"""
-    users = token_storage.list_users()
+    users = get_token_storage().list_users()
     if users:
         # Return only the most recent user ID (likely the one who just completed OAuth)
         latest_user = max(users, key=lambda x: x['created_at'])
@@ -78,7 +106,7 @@ async def root():
 @app.get("/auth/notion/login")
 async def notion_login():
     """Redirect user to Notion OAuth login page"""
-    auth_url = notion_oauth.get_auth_url()
+    auth_url = get_notion_oauth().get_auth_url()
     return RedirectResponse(url=auth_url)
 
 @app.get("/auth/notion/callback")
@@ -86,22 +114,22 @@ async def notion_callback(code: str, state: Optional[str] = None):
     """Handle Notion OAuth callback and store access token"""
     try:
         # Exchange code for access token
-        token_data = notion_oauth.exchange_code_for_token(code)
+        token_data = get_notion_oauth().exchange_code_for_token(code)
 
         # Get user info from Notion
-        user_info = notion_oauth.get_user_info(token_data["access_token"])
+        user_info = get_notion_oauth().get_user_info(token_data["access_token"])
 
         # Store token in database
         user_id = user_info.get("id", "unknown")
 
-        token_storage.store_token(
+        get_token_storage().store_token(
             user_id=user_id,
             access_token=token_data["access_token"],
             workspace_id=token_data.get("workspace_id", "unknown")
         )
 
         # Verify the token was stored correctly
-        stored_token = token_storage.get_token(user_id)
+        stored_token = get_token_storage().get_token(user_id)
         if not stored_token:
             raise Exception("Failed to store token in database")
 
@@ -205,12 +233,12 @@ async def save_to_notion(request: NotionSaveRequest):
     """Save summary to user's Notion workspace with smart categorization"""
     try:
         # Get user's access token
-        token_data = token_storage.get_token(request.user_id)
+        token_data = get_token_storage().get_token(request.user_id)
         if not token_data:
             raise HTTPException(status_code=401, detail="User not authenticated with Notion")
 
         # Create page in Notion with category organization
-        page_url = await notion_api.create_categorized_page(
+        page_url = await get_notion_api().create_categorized_page(
             access_token=token_data["access_token"],
             workspace_id=token_data["workspace_id"],
             title=f"{request.title}",
@@ -229,10 +257,10 @@ async def summarize_content(request: SummarizeRequest):
     """Summarize content using OpenAI to create concise summaries"""
     try:
         # Set the OpenAI API key for this request
-        openai_summarizer.set_api_key(request.openai_api_key)
+        get_openai_summarizer().set_api_key(request.openai_api_key)
 
         # Create summary using OpenAI
-        summary = await openai_summarizer.summarize(
+        summary = await get_openai_summarizer().summarize(
             content=request.content,
             max_length=None  # Use default max_tokens
         )
@@ -247,10 +275,10 @@ async def summarize_and_categorize_content(request: SummarizeAndCategorizeReques
     """Summarize content and automatically categorize it using OpenAI"""
     try:
         # Set the OpenAI API key for this request
-        openai_summarizer.set_api_key(request.openai_api_key)
+        get_openai_summarizer().set_api_key(request.openai_api_key)
 
         # Create summary and category using OpenAI
-        result = await openai_summarizer.summarize_and_categorize(
+        result = await get_openai_summarizer().summarize_and_categorize(
             content=request.content,
             title=request.title,
             max_length=None  # Use default max_tokens
@@ -268,14 +296,14 @@ async def summarize_and_categorize_content(request: SummarizeAndCategorizeReques
 async def get_available_categories():
     """Get list of available categories for articles"""
     return {
-        "categories": list(openai_summarizer.categories.keys()),
-        "descriptions": openai_summarizer.categories
+        "categories": list(get_openai_summarizer().categories.keys()),
+        "descriptions": get_openai_summarizer().categories
     }
 
 @app.get("/user/{user_id}/status")
 async def get_user_status(user_id: str):
     """Check if user is connected to Notion with comprehensive validation"""
-    token_data = token_storage.get_token(user_id)
+    token_data = get_token_storage().get_token(user_id)
 
     if not token_data:
         return {
@@ -288,7 +316,7 @@ async def get_user_status(user_id: str):
 
     # Validate token by testing Notion API
     try:
-        workspace_info = await notion_api.get_workspace_info(token_data["access_token"])
+        workspace_info = await get_notion_api().get_workspace_info(token_data["access_token"])
         return {
             "connected": True,
             "reason": "valid_token",
@@ -298,7 +326,7 @@ async def get_user_status(user_id: str):
         }
     except Exception as e:
         # Token exists but is invalid - remove it
-        token_storage.delete_token(user_id)
+        get_token_storage().delete_token(user_id)
         return {
             "connected": False,
             "reason": "invalid_token",

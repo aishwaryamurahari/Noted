@@ -1,7 +1,7 @@
 import sqlite3
 import json
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from config import settings
 import os
 
@@ -140,3 +140,54 @@ class TokenStorage:
         except Exception as e:
             print(f"Error cleaning up expired tokens: {e}")
             return 0
+
+
+class InMemoryTokenStorage:
+    """In-memory storage for user access tokens (for serverless environments)"""
+
+    def __init__(self):
+        self._storage: Dict[str, Dict[str, Any]] = {}
+
+    def store_token(self, user_id: str, access_token: str, workspace_id: str) -> bool:
+        """Store or update user's access token in memory"""
+        try:
+            self._storage[user_id] = {
+                "access_token": access_token,
+                "workspace_id": workspace_id,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            return True
+        except Exception as e:
+            print(f"Error storing token in memory: {e}")
+            return False
+
+    def get_token(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve user's access token from memory"""
+        return self._storage.get(user_id)
+
+    def delete_token(self, user_id: str) -> bool:
+        """Delete user's access token from memory"""
+        try:
+            if user_id in self._storage:
+                del self._storage[user_id]
+            return True
+        except Exception as e:
+            print(f"Error deleting token from memory: {e}")
+            return False
+
+    def list_users(self) -> List[Dict[str, Any]]:
+        """List all users with stored tokens"""
+        return [
+            {
+                "user_id": user_id,
+                "workspace_id": data["workspace_id"],
+                "created_at": data["created_at"]
+            }
+            for user_id, data in self._storage.items()
+        ]
+
+    def cleanup_expired_tokens(self, days: int = 30) -> int:
+        """Remove tokens older than specified days (no-op for in-memory storage)"""
+        # In-memory storage doesn't persist across restarts, so cleanup is not needed
+        return 0
