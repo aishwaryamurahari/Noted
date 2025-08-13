@@ -190,10 +190,10 @@ async def notion_callback(code: str, state: Optional[str] = None):
             <div id="user-id" style="display: none;">{user_id}</div>
             <button class="close-btn" onclick="window.close()">Close Window</button>
             <script>
-                // Auto-close after 3 seconds
+                // Auto-close after 5 seconds to give extension time to detect
                 setTimeout(() => {{
                     window.close();
-                }}, 3000);
+                }}, 5000);
             </script>
         </body>
         </html>

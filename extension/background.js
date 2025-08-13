@@ -98,7 +98,7 @@ function startOAuthMonitoring() {
         if (oauthState.isInProgress) {
             checkOAuthCompletion();
         }
-    }, 2000); // Check every 2 seconds
+    }, 1000); // Check every 1 second for faster detection
 
 }
 

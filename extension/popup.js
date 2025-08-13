@@ -735,28 +735,46 @@ class NotedPopup {
 
         // Check connection when popup gains focus (user returns from OAuth)
         window.addEventListener('focus', async () => {
-            // Only check OAuth completion if there's an active session
+            // Always check for OAuth completion when popup gains focus
             try {
                 const oauthStatus = await chrome.runtime.sendMessage({ action: 'getOAuthStatus' });
                 if (oauthStatus && oauthStatus.isInProgress) {
+                    // Check immediately, then again after a short delay
                     await this.checkOAuthCompletion();
+                    setTimeout(async () => {
+                        await this.checkOAuthCompletion();
+                    }, 500);
+                } else {
+                    // Even if no active OAuth, check connection status
+                    await this.checkNotionConnection();
                 }
             } catch (error) {
-                console.log('No active OAuth session on focus');
+                console.log('Error checking OAuth on focus:', error);
+                // Fallback: check connection anyway
+                await this.checkNotionConnection();
             }
         });
 
         // Check connection when popup becomes visible again
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden) {
-                // Only check OAuth completion if there's an active session
+                // Always check for OAuth completion when popup becomes visible
                 try {
                     const oauthStatus = await chrome.runtime.sendMessage({ action: 'getOAuthStatus' });
                     if (oauthStatus && oauthStatus.isInProgress) {
+                        // Check immediately, then again after a short delay
                         await this.checkOAuthCompletion();
+                        setTimeout(async () => {
+                            await this.checkOAuthCompletion();
+                        }, 500);
+                    } else {
+                        // Even if no active OAuth, check connection status
+                        await this.checkNotionConnection();
                     }
                 } catch (error) {
-                    console.log('No active OAuth session on visibility change');
+                    console.log('Error checking OAuth on visibility change:', error);
+                    // Fallback: check connection anyway
+                    await this.checkNotionConnection();
                 }
             }
         });
@@ -798,12 +816,28 @@ class NotedPopup {
             const keepAlive = setInterval(() => {
                 if (popup && popup.closed) {
                     clearInterval(keepAlive);
+                    // When popup closes, immediately check for OAuth completion
+                    setTimeout(async () => {
+                        await this.checkOAuthCompletion();
+                        // Check again after a short delay in case there's network lag
+                        setTimeout(async () => {
+                            await this.checkOAuthCompletion();
+                        }, 1000);
+                    }, 100);
                 } else if (popup) {
                     // Periodically check if popup still exists
                     try {
                         popup.location; // This will throw if popup is closed
                     } catch (e) {
                         clearInterval(keepAlive);
+                        // When popup closes, immediately check for OAuth completion
+                        setTimeout(async () => {
+                            await this.checkOAuthCompletion();
+                            // Check again after a short delay in case there's network lag
+                            setTimeout(async () => {
+                                await this.checkOAuthCompletion();
+                            }, 1000);
+                        }, 100);
                     }
                 }
             }, 1000);
@@ -873,7 +907,7 @@ class NotedPopup {
     async startOAuthCompletionPolling() {
         const connectNotionBtn = document.getElementById('connectNotion');
         let attempts = 0;
-        const maxAttempts = 15; // 15 attempts over 30 seconds
+        const maxAttempts = 20; // 20 attempts over 40 seconds (more time)
 
         const pollInterval = setInterval(async () => {
             attempts++;
@@ -1474,28 +1508,28 @@ class NotedPopup {
                 if (isInputMasked) {
                     // Showing masked saved key
                     saveSettingsBtn.textContent = 'API Key Saved ✓';
-                    saveSettingsBtn.style.backgroundColor = '#10b981'; // Green color for saved
+                    saveSettingsBtn.style.backgroundColor = 'white'; // White color for saved
                     saveSettingsBtn.disabled = true; // Disable until user starts editing
                 } else if (currentInputValue && currentInputValue !== savedOpenaiKey) {
                     // User has typed a different key
                     saveSettingsBtn.textContent = 'Update API Key';
-                    saveSettingsBtn.style.backgroundColor = '#f59e0b'; // Amber color for update
+                    saveSettingsBtn.style.backgroundColor = 'white'; // White color for update
                     saveSettingsBtn.disabled = false;
                 } else if (!currentInputValue) {
                     // User cleared the input
                     saveSettingsBtn.textContent = 'Enter New API Key';
-                    saveSettingsBtn.style.backgroundColor = '#6366f1'; // Default blue
+                    saveSettingsBtn.style.backgroundColor = 'white'; // White color
                     saveSettingsBtn.disabled = true;
                 } else {
                     // Same key as saved
                     saveSettingsBtn.textContent = 'API Key Unchanged';
-                    saveSettingsBtn.style.backgroundColor = '#6b7280'; // Gray color
+                    saveSettingsBtn.style.backgroundColor = 'white'; // White color
                     saveSettingsBtn.disabled = true;
                 }
             } else {
                 // No valid key saved yet
                 saveSettingsBtn.textContent = 'Save Settings';
-                saveSettingsBtn.style.backgroundColor = '#6366f1'; // Default blue
+                saveSettingsBtn.style.backgroundColor = 'white'; // White color
                 saveSettingsBtn.disabled = !currentInputValue;
             }
         }
